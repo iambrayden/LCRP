@@ -1372,14 +1372,13 @@ async function selectCustomer(identifier) {
       } else if (fd_raw.finance_data && typeof fd_raw.finance_data === 'object') {
         fd = { ...fd_raw, ...fd_raw.finance_data };
       }
-      console.log('[finance debug] raw:', JSON.stringify(fd_raw), '| merged:', JSON.stringify(fd));
-      const done  = fd.payments_complete  ?? fd.paymentsComplete  ?? 0;
+const done  = fd.payments_complete  ?? fd.paymentsComplete  ?? 0;
       const total = fd.total_payments     ?? fd.totalPayments     ?? fd.payments ?? 1;
       const pct   = Math.round((done / total) * 100);
-      // Try every known field name jg-dealerships uses for the per-payment amount
-      const amt   = fd.payment_amount     ?? fd.paymentAmount     ?? fd.amount   ??
+      const amt   = fd.recurring_payment   ?? fd.recurringPayment  ??
+                    fd.payment_amount     ?? fd.paymentAmount     ?? fd.amount   ??
                     fd.weekly_payment     ?? fd.weeklyPayment      ??
-                    (total > 0 ? Math.round((fd.finance_price ?? fd.financePrice ?? fd.owed ?? 0) / total) : 0);
+                    (total > 0 ? Math.round((fd.finance_price ?? fd.financePrice ?? fd.owed ?? fd.total ?? 0) / total) : 0);
       financeCell = `
         <div class="progress-wrap" style="min-width:120px">
           <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
@@ -1454,7 +1453,9 @@ async function loadAllFinance() {
       const done   = fd.payments_complete ?? d.payments_complete ?? 0;
       const total  = fd.total_payments    ?? d.total_payments    ?? 1;
       const pct    = Math.round((done / total) * 100);
-      const amount = fd.payment_amount    ?? d.payment_amount    ?? 0;
+      const amount = fd.recurring_payment  ?? d.recurring_payment  ??
+                     fd.payment_amount    ?? d.payment_amount     ??
+                     (total > 0 ? Math.round((fd.total ?? d.total ?? 0) / total) : 0);
       const active = pct < 100;
       if (active) activeCount++;
       const spawnCode = d.vehicle || d.model || '';
@@ -1523,7 +1524,8 @@ async function lookupFinance() {
       const done     = fd.payments_complete ?? 0;
       const total    = fd.total_payments    ?? 1;
       const pct      = Math.round((done / total) * 100);
-      const amount   = fd.payment_amount    ?? 0;
+      const amount   = fd.recurring_payment ?? fd.payment_amount ??
+                       (total > 0 ? Math.round((fd.total ?? 0) / total) : 0);
       const spawnCode = v.vehicle || v.model || '';
       return `
         <tr>
@@ -1574,7 +1576,8 @@ async function lookupPlate() {
     const done   = fd.payments_complete ?? 0;
     const total  = fd.total_payments    ?? 1;
     const pct    = Math.round((done / total) * 100);
-    const amount = fd.payment_amount    ?? 0;
+    const amount = fd.recurring_payment ?? fd.payment_amount ??
+                   (total > 0 ? Math.round((fd.total ?? 0) / total) : 0);
 
     el.innerHTML = `
       <div class="card" style="max-width:480px">
