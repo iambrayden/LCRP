@@ -374,6 +374,7 @@ local function route(req, res, body)
         if #p == 3 and p[2] == 'plate' and method == 'GET' then
             local v = jg('getFinanceByPlate', p[3])
             if not v then return err(res, 404, 'Not found or not financed') end
+            print('^5[dealership-manager]^0 getFinanceByPlate raw: ' .. json.encode(v))
             return ok(res, v)
         end
 

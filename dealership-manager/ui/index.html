@@ -1372,7 +1372,7 @@ async function selectCustomer(identifier) {
       } else if (fd_raw.finance_data && typeof fd_raw.finance_data === 'object') {
         fd = { ...fd_raw, ...fd_raw.finance_data };
       }
-      console.debug('[finance debug]', fd_raw, '→ merged:', fd);
+      console.log('[finance debug] raw:', JSON.stringify(fd_raw), '| merged:', JSON.stringify(fd));
       const done  = fd.payments_complete  ?? fd.paymentsComplete  ?? 0;
       const total = fd.total_payments     ?? fd.totalPayments     ?? fd.payments ?? 1;
       const pct   = Math.round((done / total) * 100);
