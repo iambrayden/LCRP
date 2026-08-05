@@ -64,9 +64,20 @@ local function route(req, res, body)
         bodyData = json.decode(body) or {}
     end
 
-    -- ── Health ──────────────────────────────────────────────────────────────
-    -- GET /
+    -- ── UI ───────────────────────────────────────────────────────────────────
+    -- GET / → serve the management UI
     if #p == 0 and method == 'GET' then
+        local html = LoadResourceFile(GetCurrentResourceName(), 'ui/index.html')
+        if not html then
+            return err(res, 500, 'UI file not found')
+        end
+        res.writeHead(200, { ['Content-Type'] = 'text/html; charset=utf-8' })
+        res.send(html)
+        return
+    end
+
+    -- GET /health
+    if #p == 1 and p[1] == 'health' and method == 'GET' then
         return ok(res, { ok = true, resource = 'dealership-manager', version = '1.0.0' })
     end
 
