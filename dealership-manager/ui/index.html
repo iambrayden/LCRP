@@ -643,17 +643,34 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
     <div class="section" id="section-finance">
       <div class="page-header">
         <div class="page-title">Finance</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <label style="font-size:12px;color:var(--text-sub)">Limit</label>
+          <select id="fin-limit" onchange="loadAllFinance()" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r);color:var(--text);padding:5px 8px;outline:none">
+            <option value="50">50</option>
+            <option value="100" selected>100</option>
+            <option value="250">250</option>
+            <option value="500">500</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="loadAllFinance()">↺ Refresh</button>
+        </div>
       </div>
-      <div class="toolbar">
-        <input id="fin-identifier" placeholder="Player identifier (citizenid)…" style="width:260px" onkeydown="if(event.key==='Enter')lookupFinance()" />
-        <button class="btn" onclick="lookupFinance()">Look Up</button>
-        <span style="color:var(--text-dim);font-size:12px">— or —</span>
-        <input id="fin-plate" placeholder="Plate…" style="width:120px;text-transform:uppercase" onkeydown="if(event.key==='Enter')lookupPlate()" />
-        <button class="btn btn-ghost" onclick="lookupPlate()">By Plate</button>
+      <div id="fin-all-content">
+        <div class="alert alert-info">Connect to load all active finance deals.</div>
       </div>
-      <div id="fin-content">
-        <div class="alert alert-info">Enter a player identifier or plate number to look up finance records.</div>
-      </div>
+      <details style="margin-top:20px">
+        <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text-sub);padding:8px 0;user-select:none">
+          Look up specific player / plate ▾
+        </summary>
+        <div class="toolbar" style="margin-top:10px">
+          <input id="fin-identifier" placeholder="Player identifier (citizenid)…" style="width:260px" onkeydown="if(event.key==='Enter')lookupFinance()" />
+          <button class="btn" onclick="lookupFinance()">Look Up</button>
+          <span style="color:var(--text-dim);font-size:12px">— or —</span>
+          <input id="fin-plate" placeholder="Plate…" style="width:120px;text-transform:uppercase" onkeydown="if(event.key==='Enter')lookupPlate()" />
+          <button class="btn btn-ghost" onclick="lookupPlate()">By Plate</button>
+        </div>
+        <div id="fin-content" style="margin-top:10px">
+        </div>
+      </details>
     </div>
 
     <!-- ── Coupons ── -->
@@ -858,6 +875,7 @@ async function connect() {
     try { state.vehicleNames = await api.get('/vehicle-names'); } catch {}
 
     loadOverview();
+    loadAllFinance();
     toast('Connected to ' + cfg.url, 'success');
   } catch (e) {
     state.connected = false;
@@ -895,11 +913,12 @@ function onGlobalDealerChange() {
 
 function reloadActiveSection() {
   const s = state.activeSection;
-  if (s === 'stock')     loadStock();
-  else if (s === 'sales')     loadSales();
-  else if (s === 'employees') loadEmployees();
-  else if (s === 'coupons')   loadCoupons();
-  else if (s === 'overview')  loadOverview();
+  if (s === 'stock')       loadStock();
+  else if (s === 'sales')      loadSales();
+  else if (s === 'employees')  loadEmployees();
+  else if (s === 'coupons')    loadCoupons();
+  else if (s === 'overview')   loadOverview();
+  else if (s === 'finance')    loadAllFinance();
 }
 
 // ── Navigation ─────────────────────────────────────────────
@@ -918,9 +937,12 @@ function navigate(section) {
   document.querySelectorAll('.section').forEach(el => {
     el.classList.toggle('active', el.id === 'section-' + section);
   });
-  // Auto-load the section using the globally selected dealership
-  const globalId = document.getElementById('global-dealer').value;
-  if (globalId) reloadActiveSection();
+  // Finance loads without a dealership; everything else needs one selected
+  if (section === 'finance') loadAllFinance();
+  else {
+    const globalId = document.getElementById('global-dealer').value;
+    if (globalId) reloadActiveSection();
+  }
 }
 
 // ── Theme toggle ───────────────────────────────────────────
@@ -1237,6 +1259,76 @@ async function loadEmployees() {
 // ─────────────────────────────────────────────────────────────────────────────
 // FINANCE
 // ─────────────────────────────────────────────────────────────────────────────
+async function loadAllFinance() {
+  const el = document.getElementById('fin-all-content');
+  if (!state.connected) return;
+  const limit = document.getElementById('fin-limit')?.value || 100;
+
+  el.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+
+  try {
+    const deals = await api.get(`/finance?limit=${limit}`);
+
+    if (!deals.length) {
+      el.innerHTML = '<div class="alert alert-warn">No active finance deals found.</div>';
+      return;
+    }
+
+    // resolve any player names not yet cached
+    const ids = deals.map(d => d.identifier).filter(Boolean);
+    await resolvePlayerNames(ids);
+
+    let activeCount = 0;
+    const rows = deals.map(d => {
+      let fd = {};
+      try { fd = typeof d.finance_data === 'string' ? JSON.parse(d.finance_data) : (d.finance_data || {}); } catch {}
+      const done   = fd.payments_complete ?? d.payments_complete ?? 0;
+      const total  = fd.total_payments    ?? d.total_payments    ?? 1;
+      const pct    = Math.round((done / total) * 100);
+      const amount = fd.payment_amount    ?? d.payment_amount    ?? 0;
+      const active = pct < 100;
+      if (active) activeCount++;
+      const spawnCode = d.vehicle || d.model || '';
+      return `
+        <tr>
+          <td class="mono">${esc(d.plate || '—')}</td>
+          <td>${esc(vehicleName(spawnCode))}<br><span class="mono text-dim" style="font-size:11px">${esc(spawnCode)}</span></td>
+          <td>${esc(playerName(d.identifier))}<br><span class="mono text-dim" style="font-size:11px">${esc(d.identifier || '')}</span></td>
+          <td>
+            <div class="progress-wrap">
+              <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+              <span class="progress-label">${done}/${total}</span>
+            </div>
+          </td>
+          <td style="color:var(--accent)">${fmt$(amount)}</td>
+          <td><span class="badge ${pct >= 100 ? 'badge-green' : 'badge-yellow'}">${pct >= 100 ? 'Paid off' : 'Active'}</span></td>
+        </tr>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="card-grid mb-16">
+        <div class="card">
+          <div class="card-title">Active Deals</div>
+          <div class="card-value">${activeCount}</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Total Records</div>
+          <div class="card-value">${deals.length}</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Plate</th><th>Vehicle</th><th>Player</th><th>Payments</th><th>Per Payment</th><th>Status</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="alert alert-error">Failed to load finance deals: ${esc(e.message)}</div>`;
+  }
+}
+
 async function lookupFinance() {
   const identifier = document.getElementById('fin-identifier').value.trim();
   const el         = document.getElementById('fin-content');
