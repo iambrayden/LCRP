@@ -48,6 +48,51 @@ local function jg(method, ...)
     return exports['jg-dealerships'][method](exports['jg-dealerships'], ...)
 end
 
+-- ── Vehicle name map (persisted to vehicle_names.json) ───────────────────────
+
+local VNAMES_FILE = 'vehicle_names.json'
+local vehicleNames = {}
+
+local raw = LoadResourceFile(GetCurrentResourceName(), VNAMES_FILE)
+if raw then vehicleNames = json.decode(raw) or {} end
+
+local function saveVehicleNames()
+    SaveResourceFile(GetCurrentResourceName(), VNAMES_FILE, json.encode(vehicleNames), -1)
+end
+
+-- ── Player name cache (populated via QBCore events) ──────────────────────────
+
+local playerNames = {}
+
+local function cacheQBPlayer(Player)
+    pcall(function()
+        local id = Player.PlayerData.citizenid
+        local ci = Player.PlayerData.charinfo
+        if id and ci then
+            playerNames[id] = ((ci.firstname or '') .. ' ' .. (ci.lastname or '')):match('^%s*(.-)%s*$')
+        end
+    end)
+end
+
+AddEventHandler('QBCore:Server:PlayerLoaded', cacheQBPlayer)
+
+AddEventHandler('playerDropped', function()
+    pcall(function()
+        local QBCore = exports['qb-core']:GetCoreObject()
+        cacheQBPlayer(QBCore.Functions.GetPlayer(source))
+    end)
+end)
+
+local function lookupPlayerName(identifier)
+    if playerNames[identifier] then return playerNames[identifier] end
+    pcall(function()
+        local QBCore = exports['qb-core']:GetCoreObject()
+        local Player = QBCore.Functions.GetPlayerByCitizenId(identifier)
+        if Player then cacheQBPlayer(Player) end
+    end)
+    return playerNames[identifier]
+end
+
 -- ── Router ───────────────────────────────────────────────────────────────────
 
 local function route(req, res, body)
@@ -259,6 +304,27 @@ local function route(req, res, body)
         if #p == 2 and method == 'GET' then
             return ok(res, jg('getPlayerFinancedVehicles', p[2]) or {})
         end
+    end
+
+    -- ── Vehicle names ────────────────────────────────────────────────────────
+    -- GET /vehicle-names
+    if #p == 1 and p[1] == 'vehicle-names' and method == 'GET' then
+        return ok(res, vehicleNames)
+    end
+
+    -- POST /vehicle-names   { spawnCode: displayName, … }
+    if #p == 1 and p[1] == 'vehicle-names' and method == 'POST' then
+        for k, v in pairs(bodyData) do
+            vehicleNames[k] = tostring(v)
+        end
+        saveVehicleNames()
+        return ok(res, { success = true })
+    end
+
+    -- ── Player lookup ────────────────────────────────────────────────────────
+    -- GET /player/{identifier}
+    if #p == 2 and p[1] == 'player' and method == 'GET' then
+        return ok(res, { name = lookupPlayerName(p[2]) })
     end
 
     -- ── Catch-all ────────────────────────────────────────────────────────────

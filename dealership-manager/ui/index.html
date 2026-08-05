@@ -749,6 +749,8 @@ const state = {
   connected:    false,
   dealerships:  [],
   activeSection: 'overview',
+  vehicleNames: {},
+  playerNames:  {},
 };
 
 // ── Restore inputs ─────────────────────────────────────────
@@ -851,6 +853,8 @@ async function connect() {
 
     state.dealerships = await api.get('/dealerships');
     populateDealerSelects();
+
+    try { state.vehicleNames = await api.get('/vehicle-names'); } catch {}
 
     loadOverview();
     toast('Connected to ' + cfg.url, 'success');
@@ -961,11 +965,16 @@ async function loadOverview() {
     const outOfStock = vehicles.filter(v => !v.unlimited_stock && (v.stock ?? 0) === 0).length;
     const unlimited  = vehicles.filter(v => v.unlimited_stock).length;
 
+    if (sales.length) {
+      const ids = sales.flatMap(s => [s.player, s.seller]).filter(Boolean);
+      await resolvePlayerNames(ids);
+    }
+
     const recentRows = sales.length ? sales.map(s => `
       <tr>
         <td class="mono">${esc(s.plate || '—')}</td>
-        <td class="mono">${esc(s.vehicle || '—')}</td>
-        <td class="text-sub">${esc(s.player || '—')}</td>
+        <td>${esc(vehicleName(s.vehicle))}</td>
+        <td class="text-sub">${esc(playerName(s.player))}</td>
         <td>${purchaseBadge(s.purchase_type)}</td>
         <td style="color:var(--green);font-weight:600">${fmt$(s.paid)}</td>
       </tr>`).join('')
@@ -1027,22 +1036,29 @@ async function loadStock() {
 
     let rows = '';
     vehicles.forEach(v => {
-      const stockDisplay = v.unlimited_stock ? '∞' : (v.stock ?? 0);
+      const displayName = vehicleName(v.spawn_code, v.brand, v.model);
+      const safeCode    = esc(v.spawn_code);
+      const safeDN      = esc(displayName);
       rows += `
         <tr>
-          <td class="mono">${esc(v.spawn_code)}</td>
-          <td>${esc(v.brand || '—')}</td>
-          <td>${esc(v.model || '—')}</td>
+          <td class="mono">${safeCode}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span>${safeDN}</span>
+              <button class="icon-btn" style="font-size:11px;padding:3px 6px" title="Set display name"
+                onclick="editVehicleName('${safeCode}','${safeDN}',this)">✏</button>
+            </div>
+          </td>
           <td><span class="badge badge-gray">${esc(v.category || '—')}</span></td>
           <td style="color:var(--green);font-weight:600">${fmt$(v.price)}</td>
           <td>${stockBadge(v.stock, v.unlimited_stock)}</td>
           <td>
             ${v.unlimited_stock ? '<span class="text-dim">Unlimited</span>' : `
             <div class="stock-ctrl">
-              <button class="icon-btn danger" title="Decrement" onclick="adjustStock('${esc(dealershipId)}','${esc(v.spawn_code)}','decrement',this)">−</button>
-              <input type="number" min="0" value="${v.stock ?? 0}" id="si-${esc(v.spawn_code)}" style="width:64px" />
-              <button class="icon-btn" title="Increment" onclick="adjustStock('${esc(dealershipId)}','${esc(v.spawn_code)}','increment',this)">+</button>
-              <button class="btn btn-sm btn-ghost" onclick="setStock('${esc(dealershipId)}','${esc(v.spawn_code)}',this)">Set</button>
+              <button class="icon-btn danger" title="Decrement" onclick="adjustStock('${esc(dealershipId)}','${safeCode}','decrement',this)">−</button>
+              <input type="number" min="0" value="${v.stock ?? 0}" id="si-${safeCode}" style="width:64px" />
+              <button class="icon-btn" title="Increment" onclick="adjustStock('${esc(dealershipId)}','${safeCode}','increment',this)">+</button>
+              <button class="btn btn-sm btn-ghost" onclick="setStock('${esc(dealershipId)}','${safeCode}',this)">Set</button>
             </div>`}
           </td>
         </tr>`;
@@ -1053,7 +1069,7 @@ async function loadStock() {
         <table>
           <thead>
             <tr>
-              <th>Spawn Code</th><th>Brand</th><th>Model</th><th>Category</th>
+              <th>Spawn Code</th><th>Display Name</th><th>Category</th>
               <th>Price</th><th>Stock</th><th>Actions</th>
             </tr>
           </thead>
@@ -1113,18 +1129,24 @@ async function loadSales() {
       api.get(`/dealerships/${dealershipId}/total-sales`),
     ]);
 
+    if (sales.length) {
+      const ids = sales.flatMap(s => [s.player, s.seller]).filter(Boolean);
+      await resolvePlayerNames(ids);
+    }
+
     let rows = '';
     if (!sales.length) {
-      rows = '<tr><td colspan="8" class="loading-row">No sales records found.</td></tr>';
+      rows = '<tr><td colspan="7" class="loading-row">No sales records found.</td></tr>';
     } else {
       sales.forEach(s => {
         const owed = (s.owed ?? 0) - (s.paid ?? 0);
+        const vname = vehicleName(s.vehicle);
         rows += `
           <tr>
             <td class="mono">${esc(s.plate || '—')}</td>
-            <td class="mono">${esc(s.vehicle || '—')}</td>
-            <td class="text-sub">${esc(s.player || '—')}</td>
-            <td class="text-sub">${esc(s.seller || '—')}</td>
+            <td>${esc(vname)}<br><span class="mono text-dim" style="font-size:11px">${esc(s.vehicle || '')}</span></td>
+            <td class="text-sub">${esc(playerName(s.player))}</td>
+            <td class="text-sub">${esc(playerName(s.seller))}</td>
             <td>${purchaseBadge(s.purchase_type)}</td>
             <td style="color:var(--green);font-weight:600">${fmt$(s.paid)}</td>
             <td style="color:${owed > 0 ? 'var(--yellow)' : 'var(--text-dim)'}">${owed > 0 ? fmt$(owed) : '—'}</td>
@@ -1177,9 +1199,14 @@ async function loadEmployees() {
       return;
     }
 
+    await resolvePlayerNames(employees.map(e => e.identifier).filter(Boolean));
+
     let rows = employees.map(e => `
       <tr>
-        <td class="mono">${esc(e.identifier || '—')}</td>
+        <td>
+          ${esc(playerName(e.identifier))}
+          ${state.playerNames[e.identifier] ? `<br><span class="mono text-dim" style="font-size:11px">${esc(e.identifier)}</span>` : ''}
+        </td>
         <td>${roleBadge(e.role)}</td>
         <td class="text-dim">${fmtDate(e.joined)}</td>
       </tr>`).join('');
@@ -1193,7 +1220,7 @@ async function loadEmployees() {
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Identifier</th><th>Role</th><th>Joined</th></tr></thead>
+          <thead><tr><th>Employee</th><th>Role</th><th>Joined</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>`;
@@ -1231,10 +1258,11 @@ async function lookupFinance() {
       const total    = fd.total_payments    ?? 1;
       const pct      = Math.round((done / total) * 100);
       const amount   = fd.payment_amount    ?? 0;
+      const spawnCode = v.vehicle || v.model || '';
       return `
         <tr>
           <td class="mono">${esc(v.plate || '—')}</td>
-          <td class="mono">${esc(v.vehicle || v.model || '—')}</td>
+          <td>${esc(vehicleName(spawnCode))}<br><span class="mono text-dim" style="font-size:11px">${esc(spawnCode)}</span></td>
           <td>
             <div class="progress-wrap">
               <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
@@ -1287,7 +1315,7 @@ async function lookupPlate() {
         <div class="card-title">Finance Record — ${esc(plate)}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
           <div class="dealer-stat"><div class="dealer-stat-label">Plate</div><div class="dealer-stat-value mono">${esc(v.plate)}</div></div>
-          <div class="dealer-stat"><div class="dealer-stat-label">Player</div><div class="dealer-stat-value mono" style="font-size:13px">${esc(v.identifier || '—')}</div></div>
+          <div class="dealer-stat"><div class="dealer-stat-label">Player</div><div class="dealer-stat-value" style="font-size:13px">${esc(playerName(v.identifier))}</div></div>
           <div class="dealer-stat"><div class="dealer-stat-label">Per Payment</div><div class="dealer-stat-value">${fmt$(amount)}</div></div>
           <div class="dealer-stat"><div class="dealer-stat-label">Progress</div><div class="dealer-stat-value">${done}/${total} (${pct}%)</div></div>
         </div>
@@ -1402,6 +1430,61 @@ async function loadCoupons() {
       </div>`;
   } catch (e) {
     el.innerHTML = `<div class="alert alert-error">Failed to load coupons: ${esc(e.message)}</div>`;
+  }
+}
+
+// ── Vehicle & player name helpers ──────────────────────────
+function vehicleName(spawnCode, brand, model) {
+  if (spawnCode && state.vehicleNames[spawnCode]) return state.vehicleNames[spawnCode];
+  const parts = [brand, model].filter(Boolean);
+  return parts.length ? parts.join(' ') : (spawnCode || '—');
+}
+
+async function resolvePlayerNames(identifiers) {
+  const unknown = [...new Set(identifiers)].filter(id => id && !state.playerNames[id]);
+  await Promise.allSettled(unknown.map(async id => {
+    try {
+      const res = await api.get(`/player/${encodeURIComponent(id)}`);
+      if (res.name) state.playerNames[id] = res.name;
+    } catch {}
+  }));
+}
+
+function playerName(identifier) {
+  if (!identifier) return '—';
+  return state.playerNames[identifier] || identifier;
+}
+
+function editVehicleName(spawnCode, currentName, btn) {
+  const td = btn.closest('td');
+  const safeCode = esc(spawnCode);
+  const safeName = esc(currentName);
+  td.innerHTML = `
+    <div style="display:flex;align-items:center;gap:4px">
+      <input type="text" value="${safeName}" id="vn-inp-${safeCode}"
+        style="width:150px;background:var(--bg-raised);border:1px solid var(--accent);border-radius:var(--r);color:var(--text);padding:4px 8px;outline:none"
+        onkeydown="if(event.key==='Enter')saveVehicleName('${safeCode}',this.nextElementSibling);else if(event.key==='Escape')loadStock()" />
+      <button class="btn btn-sm btn-success" onclick="saveVehicleName('${safeCode}',this)">✓</button>
+      <button class="btn btn-sm btn-ghost" onclick="loadStock()">✕</button>
+    </div>`;
+  const inp = document.getElementById('vn-inp-' + safeCode);
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+async function saveVehicleName(spawnCode, btn) {
+  const inp = document.getElementById('vn-inp-' + spawnCode);
+  if (!inp) return;
+  const name = inp.value.trim();
+  if (!name) { toast('Name cannot be empty', 'error'); return; }
+  btn.disabled = true;
+  try {
+    await api.post('/vehicle-names', { [spawnCode]: name });
+    state.vehicleNames[spawnCode] = name;
+    toast('Name saved', 'success');
+    loadStock();
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+    btn.disabled = false;
   }
 }
 
