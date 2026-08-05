@@ -530,6 +530,9 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
   </div>
 
   <div class="topbar-right">
+    <select id="global-dealer" style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r);color:var(--text);padding:6px 10px;outline:none;display:none" onchange="onGlobalDealerChange()">
+      <option value="">Select dealership…</option>
+    </select>
     <button class="theme-btn" id="btn-theme" title="Toggle light/dark">◑</button>
   </div>
 </header>
@@ -659,12 +662,12 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
         <div class="page-title">Coupons</div>
       </div>
       <div class="toolbar">
-        <select id="coupon-dealer">
+        <select id="coupon-dealer" onchange="loadCoupons()">
           <option value="">Select dealership…</option>
         </select>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+      <div style="display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start">
         <div class="form-panel">
           <div class="form-title">Create Coupon</div>
           <div class="form-row">
@@ -717,28 +720,14 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
           <div id="cp-result" class="mt-8"></div>
         </div>
 
-        <div class="form-panel">
-          <div class="form-title">Validate Coupon</div>
-          <div class="form-row">
-            <label class="form-label">Coupon Code</label>
-            <input class="form-input" id="val-code" placeholder="Enter code…" style="text-transform:uppercase" />
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <span style="font-size:15px;font-weight:700">Active Coupons</span>
+            <button class="btn btn-ghost btn-sm" onclick="loadCoupons()">↺ Refresh</button>
           </div>
-          <div class="form-row">
-            <label class="form-label">Vehicle Spawn Code <span style="color:var(--text-dim)">(optional)</span></label>
-            <input class="form-input" id="val-spawn" placeholder="adder" />
+          <div id="coupon-list-content">
+            <div class="alert alert-info">Select a dealership to view coupons.</div>
           </div>
-          <div class="form-row">
-            <label class="form-label">Category <span style="color:var(--text-dim)">(optional)</span></label>
-            <input class="form-input" id="val-cat" placeholder="super" />
-          </div>
-          <div class="form-row">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-              <input type="checkbox" id="val-financed" />
-              <span class="form-label" style="margin-bottom:0">Financed purchase</span>
-            </label>
-          </div>
-          <button class="btn mt-8" onclick="validateCoupon()" style="width:100%">Validate</button>
-          <div id="val-result" class="mt-8"></div>
         </div>
       </div>
     </div>
@@ -875,7 +864,7 @@ async function connect() {
 
 // ── Populate dealership selects ────────────────────────────
 function populateDealerSelects() {
-  const ids = ['stock-dealer', 'sales-dealer', 'emp-dealer', 'coupon-dealer'];
+  const ids = ['global-dealer', 'stock-dealer', 'sales-dealer', 'emp-dealer', 'coupon-dealer'];
   ids.forEach(id => {
     const sel = document.getElementById(id);
     const prev = sel.value;
@@ -888,6 +877,24 @@ function populateDealerSelects() {
     });
     if (prev) sel.value = prev;
   });
+  document.getElementById('global-dealer').style.display = '';
+}
+
+function onGlobalDealerChange() {
+  const id = document.getElementById('global-dealer').value;
+  ['stock-dealer', 'sales-dealer', 'emp-dealer', 'coupon-dealer'].forEach(selId => {
+    document.getElementById(selId).value = id;
+  });
+  reloadActiveSection();
+}
+
+function reloadActiveSection() {
+  const s = state.activeSection;
+  if (s === 'stock')     loadStock();
+  else if (s === 'sales')     loadSales();
+  else if (s === 'employees') loadEmployees();
+  else if (s === 'coupons')   loadCoupons();
+  else if (s === 'overview')  loadOverview();
 }
 
 // ── Navigation ─────────────────────────────────────────────
@@ -906,6 +913,9 @@ function navigate(section) {
   document.querySelectorAll('.section').forEach(el => {
     el.classList.toggle('active', el.id === 'section-' + section);
   });
+  // Auto-load the section using the globally selected dealership
+  const globalId = document.getElementById('global-dealer').value;
+  if (globalId) reloadActiveSection();
 }
 
 // ── Theme toggle ───────────────────────────────────────────
@@ -1357,42 +1367,61 @@ async function createCoupon() {
         — ${discountType === 'percent' ? discountValue + '%' : fmt$(discountValue)} off
       </div>`;
     toast('Coupon created: ' + coupon.code, 'success');
+    loadCoupons();
   } catch (e) {
     resultEl.innerHTML = `<div class="alert alert-error">Failed: ${esc(e.message)}</div>`;
     toast('Failed: ' + e.message, 'error');
   }
 }
 
-async function validateCoupon() {
+async function loadCoupons() {
   const dealershipId = document.getElementById('coupon-dealer').value;
-  const code         = document.getElementById('val-code').value.trim().toUpperCase();
-  const resultEl     = document.getElementById('val-result');
-  if (!dealershipId) { toast('Select a dealership first', 'error'); return; }
-  if (!code)         { toast('Enter a coupon code', 'error'); return; }
+  const el = document.getElementById('coupon-list-content');
+  if (!dealershipId) {
+    el.innerHTML = '<div class="alert alert-info">Select a dealership to view coupons.</div>';
+    return;
+  }
   if (!state.connected) return;
 
-  const spawnCode  = document.getElementById('val-spawn').value.trim() || null;
-  const category   = document.getElementById('val-cat').value.trim()   || null;
-  const isFinanced = document.getElementById('val-financed').checked;
-
-  let qs = `?code=${encodeURIComponent(code)}&isFinanced=${isFinanced}`;
-  if (spawnCode) qs += `&spawnCode=${encodeURIComponent(spawnCode)}`;
-  if (category)  qs += `&category=${encodeURIComponent(category)}`;
+  el.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
 
   try {
-    const result = await api.get(`/dealerships/${dealershipId}/coupons/validate${qs}`);
-    if (result.valid) {
-      const disc = result.discount != null
-        ? ` — saves <strong>${fmt$(result.discount)}</strong>`
-        : (result.discount_type === 'percent'
-            ? ` — <strong>${result.discount_value}%</strong> off`
-            : ` — <strong>${fmt$(result.discount_value)}</strong> off`);
-      resultEl.innerHTML = `<div class="alert alert-success">✓ Valid coupon${disc}</div>`;
-    } else {
-      resultEl.innerHTML = `<div class="alert alert-error">✗ Invalid: ${esc(result.message || 'Unknown reason')}</div>`;
+    const coupons = await api.get(`/dealerships/${dealershipId}/coupons`);
+    if (!coupons.length) {
+      el.innerHTML = '<div class="alert alert-warn">No coupons found for this dealership.</div>';
+      return;
     }
+
+    const now = Date.now();
+    const rows = coupons.map(c => {
+      const expired = c.expiry_date && c.expiry_date < now;
+      const usesLeft = c.max_uses != null ? (c.max_uses - (c.uses ?? 0)) : null;
+      const discLabel = c.discount_type === 'percent'
+        ? `${c.discount_value}% off`
+        : fmt$(c.discount_value) + ' off';
+      return `
+        <tr>
+          <td class="mono" style="font-weight:600">${esc(c.code)}</td>
+          <td><span class="badge badge-blue">${esc(discLabel)}</span></td>
+          <td>${c.max_uses != null ? `${c.uses ?? 0} / ${c.max_uses}` : '<span class="text-dim">Unlimited</span>'}</td>
+          <td>${c.expiry_date
+            ? `<span class="${expired ? 'badge badge-red' : 'badge badge-green'}">${expired ? 'Expired' : fmtDate(c.expiry_date)}</span>`
+            : '<span class="text-dim">Never</span>'}</td>
+          <td>${c.allow_finance ? '<span class="badge badge-green">Yes</span>' : '<span class="badge badge-gray">No</span>'}</td>
+        </tr>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Code</th><th>Discount</th><th>Uses</th><th>Expiry</th><th>Finance OK</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
   } catch (e) {
-    resultEl.innerHTML = `<div class="alert alert-error">Error: ${esc(e.message)}</div>`;
+    el.innerHTML = `<div class="alert alert-error">Failed to load coupons: ${esc(e.message)}</div>`;
   }
 }
 

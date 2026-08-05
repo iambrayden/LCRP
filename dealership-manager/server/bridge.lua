@@ -148,6 +148,11 @@ local function route(req, res, body)
             return ok(res, { total = jg('getTotalSales', dealershipId) or 0 })
         end
 
+        -- GET /dealerships/{id}/coupons
+        if #p == 3 and p[3] == 'coupons' and method == 'GET' then
+            return ok(res, jg('getCoupons', dealershipId) or {})
+        end
+
         -- POST /dealerships/{id}/coupons   { discount_type, discount_value, … }
         if #p == 3 and p[3] == 'coupons' and method == 'POST' then
             local coupon, e = jg('createCoupon', dealershipId, bodyData)
