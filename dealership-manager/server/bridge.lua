@@ -265,24 +265,31 @@ end
 
 -- ── HTTP handler ─────────────────────────────────────────────────────────────
 
+local function handle(req, res, body)
+    local success, routeErr = pcall(route, req, res, body or '')
+    if not success then
+        res.writeHead(500, CORS)
+        res.send(json.encode({ error = 'Internal server error', detail = tostring(routeErr) }))
+    end
+end
+
 SetHttpHandler(function(req, res)
     print('^5[dealership-manager]^0 ' .. req.method .. ' ' .. req.path)
 
-    if req.method == 'OPTIONS' then
-        req.setDataHandler(function()
-            res.writeHead(200, CORS)
-            res.send('{}')
+    local m = req.method
+    if m == 'OPTIONS' then
+        -- CORS preflight — no body expected
+        res.writeHead(200, CORS)
+        res.send('{}')
+    elseif m == 'GET' or m == 'DELETE' then
+        -- No body expected; invoke route directly
+        handle(req, res, '')
+    else
+        -- POST/PUT/PATCH — wait for body
+        req.setDataHandler(function(body)
+            handle(req, res, body)
         end)
-        return
     end
-
-    req.setDataHandler(function(body)
-        local success, routeErr = pcall(route, req, res, body)
-        if not success then
-            res.writeHead(500, CORS)
-            res.send(json.encode({ error = 'Internal server error', detail = tostring(routeErr) }))
-        end
-    end)
 end)
 
 if API_KEY == '' then
