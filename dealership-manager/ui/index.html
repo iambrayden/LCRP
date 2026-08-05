@@ -497,6 +497,22 @@ tbody tr:hover { background: var(--bg-raised); }
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-row td { text-align: center; padding: 32px; color: var(--text-dim); }
 
+/* ── Customer list ──────────────────────────────────────── */
+.customer-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background .1s;
+}
+.customer-item:last-child { border-bottom: none; }
+.customer-item:hover { background: var(--bg-raised); }
+.customer-item.active { background: color-mix(in srgb, var(--accent) 12%, transparent); border-left: 3px solid var(--accent); padding-left: 11px; }
+.customer-name { font-weight: 600; font-size: 13.5px; }
+.customer-meta { font-size: 11px; color: var(--text-dim); }
+
 /* ── Misc ───────────────────────────────────────────────── */
 .section { display: none; }
 .section.active { display: block; }
@@ -642,35 +658,26 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
     <!-- ── Finance ── -->
     <div class="section" id="section-finance">
       <div class="page-header">
-        <div class="page-title">Finance</div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <label style="font-size:12px;color:var(--text-sub)">Limit</label>
-          <select id="fin-limit" onchange="loadAllFinance()" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r);color:var(--text);padding:5px 8px;outline:none">
-            <option value="50">50</option>
-            <option value="100" selected>100</option>
-            <option value="250">250</option>
-            <option value="500">500</option>
-          </select>
-          <button class="btn btn-ghost btn-sm" onclick="loadAllFinance()">↺ Refresh</button>
+        <div class="page-title">Customer History</div>
+        <button class="btn btn-ghost btn-sm" onclick="loadFinanceSection()">↺ Refresh</button>
+      </div>
+      <div class="toolbar" style="margin-bottom:16px">
+        <input id="fin-customer-search" placeholder="Search customer…" style="width:220px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r);color:var(--text);padding:6px 10px;outline:none"
+          oninput="filterCustomerList(this.value)" />
+      </div>
+      <div style="display:grid;grid-template-columns:280px 1fr;gap:16px;align-items:start;min-height:400px">
+        <!-- Customer list -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden">
+          <div style="padding:10px 14px;background:var(--bg-raised);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim)">Customers</div>
+          <div id="fin-customer-list" style="overflow-y:auto;max-height:600px">
+            <div class="empty"><div class="empty-msg">Select a dealership above.</div></div>
+          </div>
+        </div>
+        <!-- Purchase history -->
+        <div id="fin-history-panel">
+          <div class="empty"><div class="empty-msg" style="color:var(--text-dim)">Select a customer to view their purchase history.</div></div>
         </div>
       </div>
-      <div id="fin-all-content">
-        <div class="alert alert-info">Connect to load all active finance deals.</div>
-      </div>
-      <details style="margin-top:20px">
-        <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text-sub);padding:8px 0;user-select:none">
-          Look up specific player / plate ▾
-        </summary>
-        <div class="toolbar" style="margin-top:10px">
-          <input id="fin-identifier" placeholder="Player identifier (citizenid)…" style="width:260px" onkeydown="if(event.key==='Enter')lookupFinance()" />
-          <button class="btn" onclick="lookupFinance()">Look Up</button>
-          <span style="color:var(--text-dim);font-size:12px">— or —</span>
-          <input id="fin-plate" placeholder="Plate…" style="width:120px;text-transform:uppercase" onkeydown="if(event.key==='Enter')lookupPlate()" />
-          <button class="btn btn-ghost" onclick="lookupPlate()">By Plate</button>
-        </div>
-        <div id="fin-content" style="margin-top:10px">
-        </div>
-      </details>
     </div>
 
     <!-- ── Coupons ── -->
@@ -875,7 +882,6 @@ async function connect() {
     try { state.vehicleNames = await api.get('/vehicle-names'); } catch {}
 
     loadOverview();
-    loadAllFinance();
     toast('Connected to ' + cfg.url, 'success');
   } catch (e) {
     state.connected = false;
@@ -918,7 +924,7 @@ function reloadActiveSection() {
   else if (s === 'employees')  loadEmployees();
   else if (s === 'coupons')    loadCoupons();
   else if (s === 'overview')   loadOverview();
-  else if (s === 'finance')    loadAllFinance();
+  else if (s === 'finance')    loadFinanceSection();
 }
 
 // ── Navigation ─────────────────────────────────────────────
@@ -937,8 +943,8 @@ function navigate(section) {
   document.querySelectorAll('.section').forEach(el => {
     el.classList.toggle('active', el.id === 'section-' + section);
   });
-  // Finance loads without a dealership; everything else needs one selected
-  if (section === 'finance') loadAllFinance();
+  // Finance loads without a dealership selector (uses global); others need it
+  if (section === 'finance') loadFinanceSection();
   else {
     const globalId = document.getElementById('global-dealer').value;
     if (globalId) reloadActiveSection();
@@ -1257,12 +1263,166 @@ async function loadEmployees() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FINANCE
+// FINANCE — customer history
 // ─────────────────────────────────────────────────────────────────────────────
+const finState = { sales: [], customers: [], selectedId: null };
+
+async function loadFinanceSection() {
+  const dealershipId = document.getElementById('global-dealer').value;
+  const listEl = document.getElementById('fin-customer-list');
+  const histEl = document.getElementById('fin-history-panel');
+  if (!state.connected) return;
+
+  if (!dealershipId) {
+    listEl.innerHTML = '<div class="empty"><div class="empty-msg">Select a dealership above.</div></div>';
+    histEl.innerHTML = '';
+    return;
+  }
+
+  listEl.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+  histEl.innerHTML = '';
+  finState.selectedId = null;
+
+  try {
+    const sales = await api.get(`/dealerships/${dealershipId}/sales?limit=500`);
+    finState.sales = sales;
+
+    const seen = new Map();
+    sales.forEach(s => {
+      if (!s.player) return;
+      seen.set(s.player, (seen.get(s.player) || 0) + 1);
+    });
+    finState.customers = [...seen.entries()].map(([id, count]) => ({ id, count }));
+
+    await resolvePlayerNames(finState.customers.map(c => c.id));
+    renderCustomerList(finState.customers);
+  } catch (e) {
+    listEl.innerHTML = `<div class="empty"><div class="empty-msg" style="color:var(--red)">${esc(e.message)}</div></div>`;
+  }
+}
+
+function renderCustomerList(customers) {
+  const listEl = document.getElementById('fin-customer-list');
+  if (!customers.length) {
+    listEl.innerHTML = '<div class="empty"><div class="empty-msg">No customers found.</div></div>';
+    return;
+  }
+  listEl.innerHTML = customers.map(c => {
+    const name = playerName(c.id);
+    const isRaw = name === c.id; // no name resolved yet
+    return `<div class="customer-item${finState.selectedId === c.id ? ' active' : ''}" onclick="selectCustomer('${esc(c.id)}')">
+      <span class="customer-name">${esc(isRaw ? c.id : name)}</span>
+      <span class="customer-meta">${isRaw ? '' : `<span class="mono">${esc(c.id)}</span> · `}${c.count} purchase${c.count !== 1 ? 's' : ''}</span>
+    </div>`;
+  }).join('');
+}
+
+function filterCustomerList(query) {
+  const q = query.toLowerCase();
+  const filtered = q
+    ? finState.customers.filter(c => {
+        const name = playerName(c.id).toLowerCase();
+        return name.includes(q) || c.id.toLowerCase().includes(q);
+      })
+    : finState.customers;
+  renderCustomerList(filtered);
+}
+
+async function selectCustomer(identifier) {
+  finState.selectedId = identifier;
+  const q = document.getElementById('fin-customer-search').value;
+  filterCustomerList(q);
+
+  const panel = document.getElementById('fin-history-panel');
+  panel.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+
+  const purchases = finState.sales.filter(s => s.player === identifier);
+  const name      = playerName(identifier);
+
+  const financedPlates = purchases
+    .filter(s => s.purchase_type === 'finance' || s.purchase_type === 'financed')
+    .map(s => s.plate).filter(Boolean);
+
+  const financeMap = {};
+  await Promise.allSettled(financedPlates.map(async plate => {
+    try {
+      const fd = await api.get(`/finance/plate/${encodeURIComponent(plate)}`);
+      if (fd) financeMap[plate] = fd;
+    } catch {}
+  }));
+
+  if (!purchases.length) {
+    panel.innerHTML = '<div class="alert alert-warn">No purchases found for this customer.</div>';
+    return;
+  }
+
+  const totalSpent = purchases.reduce((sum, s) => sum + (s.paid ?? 0), 0);
+  const finCount   = purchases.filter(s => s.purchase_type === 'finance' || s.purchase_type === 'financed').length;
+
+  const rows = purchases.map(s => {
+    const spawnCode  = s.vehicle || '';
+    const isFinanced = s.purchase_type === 'finance' || s.purchase_type === 'financed';
+    const fd_raw     = financeMap[s.plate];
+    let financeCell  = '<span class="text-dim">—</span>';
+    if (isFinanced && fd_raw) {
+      let fd = {};
+      try { fd = typeof fd_raw.finance_data === 'string' ? JSON.parse(fd_raw.finance_data) : (fd_raw.finance_data || fd_raw); } catch {}
+      const done  = fd.payments_complete ?? fd_raw.payments_complete ?? 0;
+      const total = fd.total_payments    ?? fd_raw.total_payments    ?? 1;
+      const pct   = Math.round((done / total) * 100);
+      const amt   = fd.payment_amount    ?? fd_raw.payment_amount    ?? 0;
+      financeCell = `
+        <div class="progress-wrap" style="min-width:120px">
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <span class="progress-label">${done}/${total}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:2px">${fmt$(amt)}/payment · <span class="badge ${pct >= 100 ? 'badge-green' : 'badge-yellow'}" style="font-size:10px">${pct >= 100 ? 'Paid off' : 'Active'}</span></div>`;
+    } else if (isFinanced) {
+      financeCell = '<span class="badge badge-yellow">Financed</span>';
+    }
+
+    const ts = s.date ?? s.timestamp ?? s.created_at ?? s.time ?? null;
+    return `
+      <tr>
+        <td class="mono">${esc(s.plate || '—')}</td>
+        <td>${esc(vehicleName(spawnCode))}<br><span class="mono text-dim" style="font-size:11px">${esc(spawnCode)}</span></td>
+        <td class="text-dim">${ts ? fmtDate(ts) : '—'}</td>
+        <td>${purchaseBadge(s.purchase_type)}</td>
+        <td style="color:var(--green);font-weight:600">${fmt$(s.paid)}</td>
+        <td>${financeCell}</td>
+      </tr>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <div class="card-grid mb-16">
+      <div class="card">
+        <div class="card-title">Customer</div>
+        <div class="card-value" style="font-size:18px">${esc(name)}</div>
+        <div class="card-sub mono">${esc(identifier)}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Total Purchases</div>
+        <div class="card-value">${purchases.length}</div>
+        <div class="card-sub">${finCount} financed</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Total Spent</div>
+        <div class="card-value">${fmt$(totalSpent)}</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Plate</th><th>Vehicle</th><th>Date</th><th>Type</th><th>Paid</th><th>Finance Status</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+// kept for bridge compatibility (GET /finance?limit=N still exists)
 async function loadAllFinance() {
   const el = document.getElementById('fin-all-content');
-  if (!state.connected) return;
-  const limit = document.getElementById('fin-limit')?.value || 100;
+  if (!el || !state.connected) return;
+  const limit = 100;
 
   el.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
 
