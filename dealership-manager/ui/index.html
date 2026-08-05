@@ -746,11 +746,12 @@ const cfg = {
 };
 
 const state = {
-  connected:    false,
-  dealerships:  [],
-  activeSection: 'overview',
-  vehicleNames: {},
-  playerNames:  {},
+  connected:      false,
+  dealerships:    [],
+  activeSection:  'overview',
+  vehicleNames:   {},
+  playerNames:    {},
+  vehicleApiCache: {}, // spawnCode → { brand, model } from vehicles API
 };
 
 // ── Restore inputs ─────────────────────────────────────────
@@ -961,6 +962,8 @@ async function loadOverview() {
     const vehicles  = vehiclesRes.status === 'fulfilled' ? vehiclesRes.value     : [];
     const sales     = salesRes.status    === 'fulfilled' ? salesRes.value        : [];
 
+    cacheVehicles(vehicles);
+
     const inStock    = vehicles.filter(v => !v.unlimited_stock && (v.stock ?? 0) > 0).length;
     const outOfStock = vehicles.filter(v => !v.unlimited_stock && (v.stock ?? 0) === 0).length;
     const unlimited  = vehicles.filter(v => v.unlimited_stock).length;
@@ -1033,6 +1036,8 @@ async function loadStock() {
       el.innerHTML = '<div class="alert alert-warn">No vehicles in showroom.</div>';
       return;
     }
+
+    cacheVehicles(vehicles);
 
     let rows = '';
     vehicles.forEach(v => {
@@ -1436,8 +1441,19 @@ async function loadCoupons() {
 // ── Vehicle & player name helpers ──────────────────────────
 function vehicleName(spawnCode, brand, model) {
   if (spawnCode && state.vehicleNames[spawnCode]) return state.vehicleNames[spawnCode];
-  const parts = [brand, model].filter(Boolean);
+  const cached = spawnCode && state.vehicleApiCache[spawnCode];
+  const b = brand || cached?.brand;
+  const m = model || cached?.model;
+  const parts = [b, m].filter(Boolean);
   return parts.length ? parts.join(' ') : (spawnCode || '—');
+}
+
+function cacheVehicles(vehicles) {
+  vehicles.forEach(v => {
+    if (v.spawn_code) {
+      state.vehicleApiCache[v.spawn_code] = { brand: v.brand, model: v.model };
+    }
+  });
 }
 
 async function resolvePlayerNames(identifiers) {
