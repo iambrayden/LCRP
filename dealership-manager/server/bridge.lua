@@ -45,7 +45,14 @@ local function parts(path)
 end
 
 local function jg(method, ...)
-    return exports['jg-dealerships'][method](exports['jg-dealerships'], ...)
+    local args = { ... }
+    local ok, result = pcall(function()
+        return exports['jg-dealerships'][method](exports['jg-dealerships'], table.unpack(args))
+    end)
+    if not ok then
+        error('jg-dealerships export "' .. method .. '" failed: ' .. tostring(result), 2)
+    end
+    return result
 end
 
 -- ── Vehicle name map (persisted to vehicle_names.json) ───────────────────────

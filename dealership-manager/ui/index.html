@@ -789,7 +789,7 @@ const api = {
   async get(path) {
     const r = await fetch(api.base() + path, { headers: api.headers() });
     const body = await r.json().catch(() => ({ error: 'Invalid JSON' }));
-    if (!r.ok) throw new Error(body.error || r.statusText);
+    if (!r.ok) throw new Error(body.detail ? `${body.error}: ${body.detail}` : (body.error || r.statusText));
     return body;
   },
   async post(path, data) {
@@ -799,7 +799,7 @@ const api = {
       body: JSON.stringify(data),
     });
     const body = await r.json().catch(() => ({ error: 'Invalid JSON' }));
-    if (!r.ok) throw new Error(body.error || r.statusText);
+    if (!r.ok) throw new Error(body.detail ? `${body.error}: ${body.detail}` : (body.error || r.statusText));
     return body;
   },
 };
