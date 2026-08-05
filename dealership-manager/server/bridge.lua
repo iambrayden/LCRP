@@ -281,7 +281,13 @@ SetHttpHandler(function(req, res)
     end)
 end)
 
-print('^2[dealership-manager]^0 HTTP bridge ready — base URL: ^5/dealership-manager/^0')
 if API_KEY == '' then
     print('^3[dealership-manager]^0 Warning: no API key set. Add ^5set dealership_manager_api_key "secret"^0 to server.cfg')
 end
+
+-- Fetch public IP then print the access URL
+PerformHttpRequest('https://api.ipify.org', function(status, body)
+    local ip = (status == 200 and body and body:match('[%d%.]+')) or '<server-ip>'
+    local port = GetConvar('sv_httpPort', GetConvar('netPort', '30120'))
+    print('^2[dealership-manager]^0 UI ready → ^5http://' .. ip .. ':' .. port .. '/dealership-manager/^0')
+end, 'GET', '', { ['Accept'] = 'text/plain' })
