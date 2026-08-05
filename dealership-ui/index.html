@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dealership Manager — ValorNode</title>
+<style>
+/* ── Tokens ─────────────────────────────────────────────── */
+:root {
+  --bg:         #F7F9FC;
+  --bg-surface: #FFFFFF;
+  --bg-raised:  #EEF2F7;
+  --border:     #D6DCE8;
+  --text:       #0D1526;
+  --text-sub:   #4A5568;
+  --text-dim:   #8898AA;
+  --accent:     #0284C7;
+  --accent-hi:  #38BDF8;
+  --green:      #16A34A;
+  --green-bg:   #F0FDF4;
+  --yellow:     #CA8A04;
+  --yellow-bg:  #FFFBEA;
+  --red:        #DC2626;
+  --red-bg:     #FFF1F2;
+  --shadow:     0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:  0 4px 12px rgba(0,0,0,.10);
+  --r:          8px;
+  --sidebar-w:  220px;
+  --top-h:      56px;
+}
+@media (prefers-color-scheme: dark) { :root { --theme: dark; } }
+[data-theme="dark"] {
+  --bg:         #0B1220;
+  --bg-surface: #111C2E;
+  --bg-raised:  #172035;
+  --border:     #1E3050;
+  --text:       #E8EFF8;
+  --text-sub:   #8DA4C4;
+  --text-dim:   #4A6080;
+  --accent:     #38BDF8;
+  --accent-hi:  #7DD3FC;
+  --green:      #22C55E;
+  --green-bg:   #052012;
+  --yellow:     #FBBF24;
+  --yellow-bg:  #1C1500;
+  --red:        #FB4563;
+  --red-bg:     #200912;
+  --shadow:     0 1px 4px rgba(0,0,0,.4);
+  --shadow-md:  0 4px 16px rgba(0,0,0,.5);
+}
+[data-theme="light"] {
+  --bg:         #F7F9FC;
+  --bg-surface: #FFFFFF;
+  --bg-raised:  #EEF2F7;
+  --border:     #D6DCE8;
+  --text:       #0D1526;
+  --text-sub:   #4A5568;
+  --text-dim:   #8898AA;
+  --accent:     #0284C7;
+  --accent-hi:  #38BDF8;
+  --green:      #16A34A;
+  --green-bg:   #F0FDF4;
+  --yellow:     #CA8A04;
+  --yellow-bg:  #FFFBEA;
+  --red:        #DC2626;
+  --red-bg:     #FFF1F2;
+  --shadow:     0 1px 3px rgba(0,0,0,.08);
+  --shadow-md:  0 4px 12px rgba(0,0,0,.10);
+}
+
+/* ── Reset ──────────────────────────────────────────────── */
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: system-ui, -apple-system, sans-serif; font-size: 14px; }
+body { background: var(--bg); color: var(--text); display: flex; flex-direction: column; }
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; font: inherit; }
+input, select, textarea { font: inherit; }
+table { border-collapse: collapse; width: 100%; }
+
+/* ── Top bar ────────────────────────────────────────────── */
+.topbar {
+  height: var(--top-h);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+  flex-shrink: 0;
+  box-shadow: var(--shadow);
+  z-index: 10;
+}
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  white-space: nowrap;
+  color: var(--accent);
+  margin-right: 8px;
+}
+.topbar-brand svg { flex-shrink: 0; }
+.topbar-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+.topbar input {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text);
+  padding: 6px 10px;
+  outline: none;
+  transition: border-color .15s;
+}
+.topbar input:focus { border-color: var(--accent); }
+#inp-url  { width: 220px; }
+#inp-key  { width: 180px; }
+.btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--r);
+  padding: 6px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  transition: opacity .15s;
+  white-space: nowrap;
+}
+.btn:hover { opacity: .85; }
+.btn.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn.btn-ghost {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.btn.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn.btn-danger { background: var(--red); }
+.btn.btn-success { background: var(--green); }
+.status-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex-shrink: 0;
+  transition: background .3s;
+}
+.status-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.status-dot.error { background: var(--red); }
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.theme-btn {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 5px 8px;
+  color: var(--text-sub);
+  font-size: 13px;
+  line-height: 1;
+}
+.theme-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ── Layout ─────────────────────────────────────────────── */
+.layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Sidebar ────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+.nav-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 10px 18px 4px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 18px;
+  border-radius: 0;
+  color: var(--text-sub);
+  font-weight: 500;
+  font-size: 13.5px;
+  transition: background .12s, color .12s;
+  cursor: pointer;
+  user-select: none;
+}
+.nav-item:hover { background: var(--bg-raised); color: var(--text); }
+.nav-item.active {
+  background: var(--bg-raised);
+  color: var(--accent);
+  border-left: 3px solid var(--accent);
+  padding-left: 15px;
+}
+.nav-icon { width: 18px; height: 18px; opacity: .7; flex-shrink: 0; }
+.nav-item.active .nav-icon { opacity: 1; }
+
+/* ── Main content ───────────────────────────────────────── */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  min-width: 0;
+}
+
+/* ── Page header ────────────────────────────────────────── */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.page-title { font-size: 20px; font-weight: 700; }
+.page-title small { font-size: 13px; color: var(--text-sub); font-weight: 400; margin-left: 8px; }
+
+/* ── Cards ──────────────────────────────────────────────── */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+.card-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.card-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+.card-sub { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
+
+/* Dealership overview cards */
+.dealer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+.dealer-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dealer-card-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+.dealer-card-id {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: monospace;
+}
+.dealer-card-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.dealer-stat { display: flex; flex-direction: column; gap: 2px; }
+.dealer-stat-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em; }
+.dealer-stat-value { font-size: 16px; font-weight: 600; }
+.dealer-card-actions { display: flex; gap: 8px; margin-top: 4px; }
+
+/* ── Section toolbar ────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.toolbar select, .toolbar input {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text);
+  padding: 6px 10px;
+  outline: none;
+}
+.toolbar select:focus, .toolbar input:focus { border-color: var(--accent); }
+
+/* ── Tables ─────────────────────────────────────────────── */
+.table-wrap {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+thead th {
+  background: var(--bg-raised);
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-dim);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--bg-raised); }
+.mono { font-family: monospace; font-size: 12px; }
+.text-sub { color: var(--text-sub); }
+.text-dim { color: var(--text-dim); font-size: 12px; }
+
+/* ── Badges ─────────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge-green  { background: var(--green-bg);  color: var(--green);  }
+.badge-yellow { background: var(--yellow-bg); color: var(--yellow); }
+.badge-red    { background: var(--red-bg);    color: var(--red);    }
+.badge-blue   { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.badge-gray   { background: var(--bg-raised); color: var(--text-sub); }
+
+/* ── Stock controls ─────────────────────────────────────── */
+.stock-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.stock-ctrl input[type=number] {
+  width: 64px;
+  text-align: center;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text);
+  padding: 4px 6px;
+}
+.stock-ctrl input[type=number]:focus { border-color: var(--accent); outline: none; }
+.icon-btn {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-sub);
+  padding: 4px 7px;
+  font-size: 14px;
+  line-height: 1;
+  transition: background .12s, color .12s;
+}
+.icon-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.icon-btn.danger:hover { background: var(--red); border-color: var(--red); }
+
+/* ── Progress bar ───────────────────────────────────────── */
+.progress-wrap { display: flex; align-items: center; gap: 8px; }
+.progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-raised);
+  border-radius: 100px;
+  overflow: hidden;
+  min-width: 80px;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 100px;
+  transition: width .3s;
+}
+.progress-label { font-size: 12px; color: var(--text-sub); white-space: nowrap; }
+
+/* ── Form panel ─────────────────────────────────────────── */
+.form-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  max-width: 560px;
+}
+.form-panel + .form-panel { margin-top: 16px; }
+.form-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+.form-row { margin-bottom: 12px; }
+.form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-sub); margin-bottom: 4px; }
+.form-input {
+  width: 100%;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text);
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color .15s;
+}
+.form-input:focus { border-color: var(--accent); }
+.form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-hint { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+
+/* ── Alerts / toasts ────────────────────────────────────── */
+.alert {
+  padding: 10px 14px;
+  border-radius: var(--r);
+  font-size: 13px;
+  margin-bottom: 16px;
+  border: 1px solid;
+}
+.alert-info    { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); color: var(--accent); }
+.alert-success { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+.alert-error   { background: var(--red-bg);   border-color: var(--red);   color: var(--red);   }
+.alert-warn    { background: var(--yellow-bg); border-color: var(--yellow); color: var(--yellow); }
+
+#toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 10px 16px;
+  box-shadow: var(--shadow-md);
+  font-size: 13px;
+  max-width: 320px;
+  animation: slide-in .2s ease;
+  pointer-events: auto;
+}
+.toast.success { border-left: 4px solid var(--green); }
+.toast.error   { border-left: 4px solid var(--red);   }
+.toast.info    { border-left: 4px solid var(--accent); }
+@keyframes slide-in { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* ── Empty/loading states ───────────────────────────────── */
+.empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-dim);
+}
+.empty-icon { font-size: 36px; margin-bottom: 10px; }
+.empty-msg  { font-size: 14px; }
+.spinner {
+  display: inline-block;
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-row td { text-align: center; padding: 32px; color: var(--text-dim); }
+
+/* ── Misc ───────────────────────────────────────────────── */
+.section { display: none; }
+.section.active { display: block; }
+.mt-4  { margin-top: 4px; }
+.mt-8  { margin-top: 8px; }
+.mt-16 { margin-top: 16px; }
+.mb-16 { margin-bottom: 16px; }
+.flex  { display: flex; }
+.gap-8 { gap: 8px; }
+.items-center { align-items: center; }
+hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ──────────────────────────────────────────── -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+    </svg>
+    Dealership Manager
+  </div>
+
+  <div class="topbar-inputs">
+    <input id="inp-url" placeholder="localhost:30120" title="FiveM server address and port" />
+    <input id="inp-key" type="password" placeholder="API key (optional)" title="X-API-Key value set in server.cfg" />
+    <button class="btn" id="btn-connect">Connect</button>
+    <span class="status-dot" id="status-dot" title="Connection status"></span>
+    <span id="status-label" style="font-size:12px;color:var(--text-dim)">Not connected</span>
+  </div>
+
+  <div class="topbar-right">
+    <button class="theme-btn" id="btn-theme" title="Toggle light/dark">◑</button>
+  </div>
+</header>
+
+<!-- ── Layout ───────────────────────────────────────────── -->
+<div class="layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <span class="nav-label">Manage</span>
+    <div class="nav-item active" data-section="overview">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Overview
+    </div>
+    <div class="nav-item" data-section="stock">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="17"/><line x1="9.5" y1="14.5" x2="14.5" y2="14.5"/></svg>
+      Stock
+    </div>
+    <div class="nav-item" data-section="sales">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Sales
+    </div>
+    <div class="nav-item" data-section="employees">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Employees
+    </div>
+    <div class="nav-item" data-section="finance">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+      Finance
+    </div>
+    <div class="nav-item" data-section="coupons">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+      Coupons
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="content">
+
+    <!-- ── Overview ── -->
+    <div class="section active" id="section-overview">
+      <div class="page-header">
+        <div class="page-title">Overview</div>
+        <button class="btn btn-ghost btn-sm" onclick="loadOverview()">↺ Refresh</button>
+      </div>
+      <div id="overview-content">
+        <div class="alert alert-info">Connect to your FiveM server above to load data.</div>
+      </div>
+    </div>
+
+    <!-- ── Stock ── -->
+    <div class="section" id="section-stock">
+      <div class="page-header">
+        <div class="page-title">Stock Management</div>
+      </div>
+      <div class="toolbar">
+        <select id="stock-dealer" onchange="loadStock()">
+          <option value="">Select dealership…</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="loadStock()">↺ Refresh</button>
+      </div>
+      <div id="stock-content">
+        <div class="alert alert-info">Select a dealership to manage stock.</div>
+      </div>
+    </div>
+
+    <!-- ── Sales ── -->
+    <div class="section" id="section-sales">
+      <div class="page-header">
+        <div class="page-title">Sales History</div>
+      </div>
+      <div class="toolbar">
+        <select id="sales-dealer" onchange="loadSales()">
+          <option value="">Select dealership…</option>
+        </select>
+        <label style="font-size:12px;color:var(--text-sub)">Limit</label>
+        <select id="sales-limit" onchange="loadSales()">
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="250">250</option>
+          <option value="500">500</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="loadSales()">↺ Refresh</button>
+      </div>
+      <div id="sales-content">
+        <div class="alert alert-info">Select a dealership to view sales.</div>
+      </div>
+    </div>
+
+    <!-- ── Employees ── -->
+    <div class="section" id="section-employees">
+      <div class="page-header">
+        <div class="page-title">Employees</div>
+      </div>
+      <div class="toolbar">
+        <select id="emp-dealer" onchange="loadEmployees()">
+          <option value="">Select dealership…</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="loadEmployees()">↺ Refresh</button>
+      </div>
+      <div id="emp-content">
+        <div class="alert alert-info">Select a dealership to view employees.</div>
+      </div>
+    </div>
+
+    <!-- ── Finance ── -->
+    <div class="section" id="section-finance">
+      <div class="page-header">
+        <div class="page-title">Finance</div>
+      </div>
+      <div class="toolbar">
+        <input id="fin-identifier" placeholder="Player identifier (citizenid)…" style="width:260px" onkeydown="if(event.key==='Enter')lookupFinance()" />
+        <button class="btn" onclick="lookupFinance()">Look Up</button>
+        <span style="color:var(--text-dim);font-size:12px">— or —</span>
+        <input id="fin-plate" placeholder="Plate…" style="width:120px;text-transform:uppercase" onkeydown="if(event.key==='Enter')lookupPlate()" />
+        <button class="btn btn-ghost" onclick="lookupPlate()">By Plate</button>
+      </div>
+      <div id="fin-content">
+        <div class="alert alert-info">Enter a player identifier or plate number to look up finance records.</div>
+      </div>
+    </div>
+
+    <!-- ── Coupons ── -->
+    <div class="section" id="section-coupons">
+      <div class="page-header">
+        <div class="page-title">Coupons</div>
+      </div>
+      <div class="toolbar">
+        <select id="coupon-dealer">
+          <option value="">Select dealership…</option>
+        </select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+        <div class="form-panel">
+          <div class="form-title">Create Coupon</div>
+          <div class="form-row">
+            <label class="form-label">Coupon Code <span style="color:var(--text-dim)">(leave blank to auto-generate)</span></label>
+            <input class="form-input" id="cp-code" placeholder="XXXX-XXXX" style="text-transform:uppercase" />
+          </div>
+          <div class="form-row-2">
+            <div class="form-row" style="margin-bottom:0">
+              <label class="form-label">Discount Type</label>
+              <select class="form-input" id="cp-type">
+                <option value="percent">Percent (%)</option>
+                <option value="fixed">Fixed ($)</option>
+              </select>
+            </div>
+            <div class="form-row" style="margin-bottom:0">
+              <label class="form-label">Discount Value</label>
+              <input class="form-input" id="cp-value" type="number" min="0" placeholder="e.g. 15" />
+            </div>
+          </div>
+          <hr class="divider">
+          <div class="form-row-2">
+            <div class="form-row" style="margin-bottom:0">
+              <label class="form-label">Max Total Uses</label>
+              <input class="form-input" id="cp-max-uses" type="number" min="1" placeholder="Unlimited" />
+            </div>
+            <div class="form-row" style="margin-bottom:0">
+              <label class="form-label">Per Player Limit</label>
+              <input class="form-input" id="cp-per-player" type="number" min="1" placeholder="Unlimited" />
+            </div>
+          </div>
+          <div class="form-row mt-8">
+            <label class="form-label">Vehicle Restrictions <span style="color:var(--text-dim)">(spawn codes, comma-separated)</span></label>
+            <input class="form-input" id="cp-vehicles" placeholder="adder, zentorno, t20" />
+          </div>
+          <div class="form-row">
+            <label class="form-label">Category Restrictions <span style="color:var(--text-dim)">(comma-separated)</span></label>
+            <input class="form-input" id="cp-categories" placeholder="super, sports" />
+          </div>
+          <div class="form-row">
+            <label class="form-label">Expiry Date</label>
+            <input class="form-input" id="cp-expiry" type="datetime-local" />
+          </div>
+          <div class="form-row">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="cp-allow-finance" />
+              <span class="form-label" style="margin-bottom:0">Allow with financed purchases</span>
+            </label>
+          </div>
+          <button class="btn mt-8" onclick="createCoupon()" style="width:100%">Create Coupon</button>
+          <div id="cp-result" class="mt-8"></div>
+        </div>
+
+        <div class="form-panel">
+          <div class="form-title">Validate Coupon</div>
+          <div class="form-row">
+            <label class="form-label">Coupon Code</label>
+            <input class="form-input" id="val-code" placeholder="Enter code…" style="text-transform:uppercase" />
+          </div>
+          <div class="form-row">
+            <label class="form-label">Vehicle Spawn Code <span style="color:var(--text-dim)">(optional)</span></label>
+            <input class="form-input" id="val-spawn" placeholder="adder" />
+          </div>
+          <div class="form-row">
+            <label class="form-label">Category <span style="color:var(--text-dim)">(optional)</span></label>
+            <input class="form-input" id="val-cat" placeholder="super" />
+          </div>
+          <div class="form-row">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="val-financed" />
+              <span class="form-label" style="margin-bottom:0">Financed purchase</span>
+            </label>
+          </div>
+          <button class="btn mt-8" onclick="validateCoupon()" style="width:100%">Validate</button>
+          <div id="val-result" class="mt-8"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+// ── Config & state ─────────────────────────────────────────
+const cfg = {
+  url: localStorage.getItem('dm_url') || '',
+  key: localStorage.getItem('dm_key') || '',
+};
+
+const state = {
+  connected:    false,
+  dealerships:  [],
+  activeSection: 'overview',
+};
+
+// ── Restore inputs ─────────────────────────────────────────
+document.getElementById('inp-url').value = cfg.url;
+document.getElementById('inp-key').value = cfg.key;
+
+// ── API client ─────────────────────────────────────────────
+const api = {
+  base() {
+    const u = cfg.url.trim().replace(/\/$/, '');
+    return `http://${u}/dealership-manager`;
+  },
+  headers() {
+    const h = { 'Content-Type': 'application/json' };
+    if (cfg.key) h['X-API-Key'] = cfg.key;
+    return h;
+  },
+  async get(path) {
+    const r = await fetch(api.base() + path, { headers: api.headers() });
+    const body = await r.json().catch(() => ({ error: 'Invalid JSON' }));
+    if (!r.ok) throw new Error(body.error || r.statusText);
+    return body;
+  },
+  async post(path, data) {
+    const r = await fetch(api.base() + path, {
+      method: 'POST',
+      headers: api.headers(),
+      body: JSON.stringify(data),
+    });
+    const body = await r.json().catch(() => ({ error: 'Invalid JSON' }));
+    if (!r.ok) throw new Error(body.error || r.statusText);
+    return body;
+  },
+};
+
+// ── Toasts ─────────────────────────────────────────────────
+function toast(msg, type = 'info', duration = 3500) {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+// ── Formatting ─────────────────────────────────────────────
+function fmt$(n) {
+  if (n == null) return '—';
+  return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+function fmtDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function stockBadge(v, unlimited) {
+  if (unlimited) return '<span class="badge badge-blue">Unlimited</span>';
+  if (v == null)  return '<span class="badge badge-gray">—</span>';
+  if (v === 0)    return '<span class="badge badge-red">Out of stock</span>';
+  if (v <= 3)     return `<span class="badge badge-yellow">${v} low</span>`;
+  return `<span class="badge badge-green">${v}</span>`;
+}
+function roleBadge(role) {
+  const map = {
+    manager:  'badge-blue',
+    owner:    'badge-blue',
+    salesman: 'badge-green',
+    deliver:  'badge-yellow',
+  };
+  const cls = map[role?.toLowerCase()] || 'badge-gray';
+  return `<span class="badge ${cls}">${role || '—'}</span>`;
+}
+function purchaseBadge(type) {
+  const map = { finance: 'badge-yellow', direct: 'badge-green', trade: 'badge-blue' };
+  return `<span class="badge ${map[type] || 'badge-gray'}">${type || '—'}</span>`;
+}
+
+function splitCsv(str) {
+  return str.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+// ── Connection ─────────────────────────────────────────────
+document.getElementById('btn-connect').addEventListener('click', connect);
+document.getElementById('inp-url').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
+
+async function connect() {
+  cfg.url = document.getElementById('inp-url').value.trim();
+  cfg.key = document.getElementById('inp-key').value.trim();
+  localStorage.setItem('dm_url', cfg.url);
+  localStorage.setItem('dm_key', cfg.key);
+
+  const dot = document.getElementById('status-dot');
+  const lbl = document.getElementById('status-label');
+  dot.className = 'status-dot';
+  lbl.textContent = 'Connecting…';
+
+  try {
+    await api.get('/');
+    state.connected = true;
+    dot.className = 'status-dot connected';
+    lbl.textContent = 'Connected';
+
+    state.dealerships = await api.get('/dealerships');
+    populateDealerSelects();
+
+    loadOverview();
+    toast('Connected to ' + cfg.url, 'success');
+  } catch (e) {
+    state.connected = false;
+    dot.className = 'status-dot error';
+    lbl.textContent = 'Failed';
+    toast('Connection failed: ' + e.message, 'error', 5000);
+  }
+}
+
+// ── Populate dealership selects ────────────────────────────
+function populateDealerSelects() {
+  const ids = ['stock-dealer', 'sales-dealer', 'emp-dealer', 'coupon-dealer'];
+  ids.forEach(id => {
+    const sel = document.getElementById(id);
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">Select dealership…</option>';
+    state.dealerships.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.id;
+      opt.textContent = d.name || d.id;
+      sel.appendChild(opt);
+    });
+    if (prev) sel.value = prev;
+  });
+}
+
+// ── Navigation ─────────────────────────────────────────────
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => {
+    const sec = el.dataset.section;
+    navigate(sec);
+  });
+});
+
+function navigate(section) {
+  state.activeSection = section;
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.section === section);
+  });
+  document.querySelectorAll('.section').forEach(el => {
+    el.classList.toggle('active', el.id === 'section-' + section);
+  });
+}
+
+// ── Theme toggle ───────────────────────────────────────────
+document.getElementById('btn-theme').addEventListener('click', () => {
+  const html = document.documentElement;
+  const cur = html.getAttribute('data-theme');
+  html.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OVERVIEW
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadOverview() {
+  if (!state.connected) return;
+  const el = document.getElementById('overview-content');
+  el.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+
+  try {
+    const dealerships = await api.get('/dealerships');
+    state.dealerships = dealerships;
+    populateDealerSelects();
+
+    // Fetch balance + total sales for each in parallel
+    const enriched = await Promise.all(dealerships.map(async d => {
+      const [balRes, totalRes, empRes] = await Promise.allSettled([
+        api.get(`/dealerships/${d.id}/balance`),
+        api.get(`/dealerships/${d.id}/total-sales`),
+        api.get(`/dealerships/${d.id}/employees`),
+      ]);
+      return {
+        ...d,
+        balance:    balRes.status   === 'fulfilled' ? balRes.value.balance    : null,
+        totalSales: totalRes.status === 'fulfilled' ? totalRes.value.total    : null,
+        empCount:   empRes.status   === 'fulfilled' ? empRes.value.length     : null,
+      };
+    }));
+
+    if (!enriched.length) {
+      el.innerHTML = '<div class="alert alert-warn">No dealerships found. Make sure jg-dealerships is running.</div>';
+      return;
+    }
+
+    // Summary row
+    const totalBal   = enriched.reduce((s, d) => s + (d.balance    ?? 0), 0);
+    const totalSales = enriched.reduce((s, d) => s + (d.totalSales ?? 0), 0);
+    const totalEmps  = enriched.reduce((s, d) => s + (d.empCount   ?? 0), 0);
+
+    let html = `
+      <div class="card-grid mb-16">
+        <div class="card">
+          <div class="card-title">Dealerships</div>
+          <div class="card-value">${enriched.length}</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Total Balance</div>
+          <div class="card-value">${fmt$(totalBal)}</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Total Revenue</div>
+          <div class="card-value">${fmt$(totalSales)}</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Total Employees</div>
+          <div class="card-value">${totalEmps}</div>
+        </div>
+      </div>
+      <div class="dealer-grid">`;
+
+    enriched.forEach(d => {
+      html += `
+        <div class="dealer-card">
+          <div>
+            <div class="dealer-card-name">${esc(d.name || d.id)}</div>
+            <div class="dealer-card-id">${esc(d.id)}</div>
+          </div>
+          <div class="dealer-card-stats">
+            <div class="dealer-stat">
+              <div class="dealer-stat-label">Balance</div>
+              <div class="dealer-stat-value">${fmt$(d.balance)}</div>
+            </div>
+            <div class="dealer-stat">
+              <div class="dealer-stat-label">Revenue</div>
+              <div class="dealer-stat-value">${fmt$(d.totalSales)}</div>
+            </div>
+            <div class="dealer-stat">
+              <div class="dealer-stat-label">Employees</div>
+              <div class="dealer-stat-value">${d.empCount ?? '—'}</div>
+            </div>
+            <div class="dealer-stat">
+              <div class="dealer-stat-label">Type</div>
+              <div class="dealer-stat-value" style="font-size:13px">${esc(d.type || '—')}</div>
+            </div>
+          </div>
+          <div class="dealer-card-actions">
+            <button class="btn btn-sm btn-ghost" onclick="navigate('stock');document.getElementById('stock-dealer').value='${esc(d.id)}';loadStock()">Stock</button>
+            <button class="btn btn-sm btn-ghost" onclick="navigate('sales');document.getElementById('sales-dealer').value='${esc(d.id)}';loadSales()">Sales</button>
+            <button class="btn btn-sm btn-ghost" onclick="navigate('employees');document.getElementById('emp-dealer').value='${esc(d.id)}';loadEmployees()">Employees</button>
+          </div>
+        </div>`;
+    });
+
+    html += '</div>';
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<div class="alert alert-error">Failed to load: ${esc(e.message)}</div>`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STOCK
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadStock() {
+  const dealershipId = document.getElementById('stock-dealer').value;
+  const el = document.getElementById('stock-content');
+  if (!dealershipId) {
+    el.innerHTML = '<div class="alert alert-info">Select a dealership to manage stock.</div>';
+    return;
+  }
+  if (!state.connected) return;
+
+  el.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+
+  try {
+    const vehicles = await api.get(`/dealerships/${dealershipId}/vehicles`);
+    if (!vehicles.length) {
+      el.innerHTML = '<div class="alert alert-warn">No vehicles in showroom.</div>';
+      return;
+    }
+
+    let rows = '';
+    vehicles.forEach(v => {
+      const stockDisplay = v.unlimited_stock ? '∞' : (v.stock ?? 0);
+      rows += `
+        <tr>
+          <td class="mono">${esc(v.spawn_code)}</td>
+          <td>${esc(v.brand || '—')}</td>
+          <td>${esc(v.model || '—')}</td>
+          <td><span class="badge badge-gray">${esc(v.category || '—')}</span></td>
+          <td style="color:var(--green);font-weight:600">${fmt$(v.price)}</td>
+          <td>${stockBadge(v.stock, v.unlimited_stock)}</td>
+          <td>
+            ${v.unlimited_stock ? '<span class="text-dim">Unlimited</span>' : `
+            <div class="stock-ctrl">
+              <button class="icon-btn danger" title="Decrement" onclick="adjustStock('${esc(dealershipId)}','${esc(v.spawn_code)}','decrement',this)">−</button>
+              <input type="number" min="0" value="${v.stock ?? 0}" id="si-${esc(v.spawn_code)}" style="width:64px" />
+              <button class="icon-btn" title="Increment" onclick="adjustStock('${esc(dealershipId)}','${esc(v.spawn_code)}','increment',this)">+</button>
+              <button class="btn btn-sm btn-ghost" onclick="setStock('${esc(dealershipId)}','${esc(v.spawn_code)}',this)">Set</button>
+            </div>`}
+          </td>
+        </tr>`;
+    });
+
+    el.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Spawn Code</th><th>Brand</th><th>Model</th><th>Category</th>
+              <th>Price</th><th>Stock</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="alert alert-error">Failed to load vehicles: ${esc(e.message)}</div>`;
+  }
+}
+
+async function adjustStock(dealershipId, spawnCode, action, btn) {
+  btn.disabled = true;
+  try {
+    await api.post(`/dealerships/${dealershipId}/stock/${spawnCode}/${action}`, { amount: 1 });
+    const inp = document.getElementById('si-' + spawnCode);
+    if (inp) inp.value = action === 'increment' ? Number(inp.value) + 1 : Math.max(0, Number(inp.value) - 1);
+    toast(`Stock ${action === 'increment' ? 'increased' : 'decreased'} for ${spawnCode}`, 'success');
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+  btn.disabled = false;
+}
+
+async function setStock(dealershipId, spawnCode, btn) {
+  const inp = document.getElementById('si-' + spawnCode);
+  const val = parseInt(inp?.value, 10);
+  if (isNaN(val) || val < 0) { toast('Invalid stock value', 'error'); return; }
+  btn.disabled = true;
+  try {
+    await api.post(`/dealerships/${dealershipId}/stock/${spawnCode}/set`, { stock: val });
+    toast(`Stock set to ${val} for ${spawnCode}`, 'success');
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+  btn.disabled = false;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SALES
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadSales() {
+  const dealershipId = document.getElementById('sales-dealer').value;
+  const limit        = document.getElementById('sales-limit').value;
+  const el           = document.getElementById('sales-content');
+  if (!dealershipId) {
+    el.innerHTML = '<div class="alert alert-info">Select a dealership to view sales.</div>';
+    return;
+  }
+  if (!state.connected) return;
+
+  el.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+
+  try {
+    const [sales, totalRes] = await Promise.all([
+      api.get(`/dealerships/${dealershipId}/sales?limit=${limit}`),
+      api.get(`/dealerships/${dealershipId}/total-sales`),
+    ]);
+
+    let rows = '';
+    if (!sales.length) {
+      rows = '<tr><td colspan="8" class="loading-row">No sales records found.</td></tr>';
+    } else {
+      sales.forEach(s => {
+        const owed = (s.owed ?? 0) - (s.paid ?? 0);
+        rows += `
+          <tr>
+            <td class="mono">${esc(s.plate || '—')}</td>
+            <td class="mono">${esc(s.vehicle || '—')}</td>
+            <td class="text-sub">${esc(s.player || '—')}</td>
+            <td class="text-sub">${esc(s.seller || '—')}</td>
+            <td>${purchaseBadge(s.purchase_type)}</td>
+            <td style="color:var(--green);font-weight:600">${fmt$(s.paid)}</td>
+            <td style="color:${owed > 0 ? 'var(--yellow)' : 'var(--text-dim)'}">${owed > 0 ? fmt$(owed) : '—'}</td>
+          </tr>`;
+      });
+    }
+
+    el.innerHTML = `
+      <div class="card-grid mb-16">
+        <div class="card">
+          <div class="card-title">Total Revenue</div>
+          <div class="card-value">${fmt$(totalRes.total)}</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Records Shown</div>
+          <div class="card-value">${sales.length}</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Plate</th><th>Vehicle</th><th>Player</th><th>Seller</th><th>Type</th><th>Paid</th><th>Remaining</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="alert alert-error">Failed to load sales: ${esc(e.message)}</div>`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMPLOYEES
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadEmployees() {
+  const dealershipId = document.getElementById('emp-dealer').value;
+  const el           = document.getElementById('emp-content');
+  if (!dealershipId) {
+    el.innerHTML = '<div class="alert alert-info">Select a dealership.</div>';
+    return;
+  }
+  if (!state.connected) return;
+
+  el.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+
+  try {
+    const employees = await api.get(`/dealerships/${dealershipId}/employees`);
+    if (!employees.length) {
+      el.innerHTML = '<div class="alert alert-warn">No employees found at this dealership.</div>';
+      return;
+    }
+
+    let rows = employees.map(e => `
+      <tr>
+        <td class="mono">${esc(e.identifier || '—')}</td>
+        <td>${roleBadge(e.role)}</td>
+        <td class="text-dim">${fmtDate(e.joined)}</td>
+      </tr>`).join('');
+
+    el.innerHTML = `
+      <div class="card-grid mb-16">
+        <div class="card">
+          <div class="card-title">Total Employees</div>
+          <div class="card-value">${employees.length}</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Identifier</th><th>Role</th><th>Joined</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="alert alert-error">Failed to load employees: ${esc(e.message)}</div>`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FINANCE
+// ─────────────────────────────────────────────────────────────────────────────
+async function lookupFinance() {
+  const identifier = document.getElementById('fin-identifier').value.trim();
+  const el         = document.getElementById('fin-content');
+  if (!identifier) { toast('Enter a player identifier', 'error'); return; }
+  if (!state.connected) return;
+
+  el.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+
+  try {
+    const [vehicles, countRes] = await Promise.all([
+      api.get(`/finance/${encodeURIComponent(identifier)}`),
+      api.get(`/finance/${encodeURIComponent(identifier)}/count`),
+    ]);
+
+    if (!vehicles.length) {
+      el.innerHTML = '<div class="alert alert-warn">No financed vehicles found for this player.</div>';
+      return;
+    }
+
+    let rows = vehicles.map(v => {
+      let fd = {};
+      try { fd = JSON.parse(v.finance_data || '{}'); } catch {}
+      const done     = fd.payments_complete ?? 0;
+      const total    = fd.total_payments    ?? 1;
+      const pct      = Math.round((done / total) * 100);
+      const amount   = fd.payment_amount    ?? 0;
+      return `
+        <tr>
+          <td class="mono">${esc(v.plate || '—')}</td>
+          <td class="mono">${esc(v.vehicle || v.model || '—')}</td>
+          <td>
+            <div class="progress-wrap">
+              <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+              <span class="progress-label">${done}/${total}</span>
+            </div>
+          </td>
+          <td style="color:var(--accent)">${fmt$(amount)}<span class="text-dim"> / payment</span></td>
+          <td><span class="badge ${pct >= 100 ? 'badge-green' : 'badge-yellow'}">${pct >= 100 ? 'Paid off' : 'Active'}</span></td>
+        </tr>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="card-grid mb-16">
+        <div class="card">
+          <div class="card-title">Active Finance Plans</div>
+          <div class="card-value">${countRes.count ?? vehicles.length}</div>
+          <div class="card-sub">${esc(identifier)}</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Plate</th><th>Vehicle</th><th>Payments</th><th>Per Payment</th><th>Status</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="alert alert-error">Lookup failed: ${esc(e.message)}</div>`;
+  }
+}
+
+async function lookupPlate() {
+  const plate = document.getElementById('fin-plate').value.trim().toUpperCase();
+  const el    = document.getElementById('fin-content');
+  if (!plate) { toast('Enter a plate', 'error'); return; }
+  if (!state.connected) return;
+
+  el.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+
+  try {
+    const v  = await api.get(`/finance/plate/${encodeURIComponent(plate)}`);
+    let fd   = {};
+    try { fd = JSON.parse(v.finance_data || '{}'); } catch {}
+    const done   = fd.payments_complete ?? 0;
+    const total  = fd.total_payments    ?? 1;
+    const pct    = Math.round((done / total) * 100);
+    const amount = fd.payment_amount    ?? 0;
+
+    el.innerHTML = `
+      <div class="card" style="max-width:480px">
+        <div class="card-title">Finance Record — ${esc(plate)}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+          <div class="dealer-stat"><div class="dealer-stat-label">Plate</div><div class="dealer-stat-value mono">${esc(v.plate)}</div></div>
+          <div class="dealer-stat"><div class="dealer-stat-label">Player</div><div class="dealer-stat-value mono" style="font-size:13px">${esc(v.identifier || '—')}</div></div>
+          <div class="dealer-stat"><div class="dealer-stat-label">Per Payment</div><div class="dealer-stat-value">${fmt$(amount)}</div></div>
+          <div class="dealer-stat"><div class="dealer-stat-label">Progress</div><div class="dealer-stat-value">${done}/${total} (${pct}%)</div></div>
+        </div>
+        <div class="progress-wrap mt-8" style="margin-top:12px">
+          <div class="progress-bar" style="height:8px"><div class="progress-fill" style="width:${pct}%"></div></div>
+        </div>
+        <div class="dealer-card-actions" style="margin-top:12px">
+          <span class="badge ${pct >= 100 ? 'badge-green' : 'badge-yellow'}">${pct >= 100 ? 'Paid off' : 'Active'}</span>
+        </div>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="alert alert-error">Not found or not financed: ${esc(e.message)}</div>`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COUPONS
+// ─────────────────────────────────────────────────────────────────────────────
+async function createCoupon() {
+  const dealershipId = document.getElementById('coupon-dealer').value;
+  const resultEl     = document.getElementById('cp-result');
+  if (!dealershipId) { toast('Select a dealership first', 'error'); return; }
+  if (!state.connected) return;
+
+  const discountType  = document.getElementById('cp-type').value;
+  const discountValue = parseFloat(document.getElementById('cp-value').value);
+  if (isNaN(discountValue) || discountValue <= 0) {
+    toast('Enter a valid discount value', 'error'); return;
+  }
+
+  const data = {
+    discount_type:  discountType,
+    discount_value: discountValue,
+    allow_finance:  document.getElementById('cp-allow-finance').checked,
+  };
+
+  const code = document.getElementById('cp-code').value.trim().toUpperCase();
+  if (code) data.code = code;
+
+  const maxUses   = parseInt(document.getElementById('cp-max-uses').value, 10);
+  const perPlayer = parseInt(document.getElementById('cp-per-player').value, 10);
+  const expiry    = document.getElementById('cp-expiry').value;
+  const vehicles  = splitCsv(document.getElementById('cp-vehicles').value);
+  const cats      = splitCsv(document.getElementById('cp-categories').value);
+
+  if (!isNaN(maxUses)   && maxUses > 0)   data.max_uses          = maxUses;
+  if (!isNaN(perPlayer) && perPlayer > 0)  data.per_player_limit  = perPlayer;
+  if (expiry)                              data.expiry_date        = new Date(expiry).getTime();
+  if (vehicles.length)                     data.vehicle_restrictions  = vehicles;
+  if (cats.length)                         data.category_restrictions = cats;
+
+  try {
+    const coupon = await api.post(`/dealerships/${dealershipId}/coupons`, data);
+    resultEl.innerHTML = `
+      <div class="alert alert-success">
+        ✓ Coupon created: <strong>${esc(coupon.code)}</strong>
+        — ${discountType === 'percent' ? discountValue + '%' : fmt$(discountValue)} off
+      </div>`;
+    toast('Coupon created: ' + coupon.code, 'success');
+  } catch (e) {
+    resultEl.innerHTML = `<div class="alert alert-error">Failed: ${esc(e.message)}</div>`;
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
+async function validateCoupon() {
+  const dealershipId = document.getElementById('coupon-dealer').value;
+  const code         = document.getElementById('val-code').value.trim().toUpperCase();
+  const resultEl     = document.getElementById('val-result');
+  if (!dealershipId) { toast('Select a dealership first', 'error'); return; }
+  if (!code)         { toast('Enter a coupon code', 'error'); return; }
+  if (!state.connected) return;
+
+  const spawnCode  = document.getElementById('val-spawn').value.trim() || null;
+  const category   = document.getElementById('val-cat').value.trim()   || null;
+  const isFinanced = document.getElementById('val-financed').checked;
+
+  let qs = `?code=${encodeURIComponent(code)}&isFinanced=${isFinanced}`;
+  if (spawnCode) qs += `&spawnCode=${encodeURIComponent(spawnCode)}`;
+  if (category)  qs += `&category=${encodeURIComponent(category)}`;
+
+  try {
+    const result = await api.get(`/dealerships/${dealershipId}/coupons/validate${qs}`);
+    if (result.valid) {
+      const disc = result.discount != null
+        ? ` — saves <strong>${fmt$(result.discount)}</strong>`
+        : (result.discount_type === 'percent'
+            ? ` — <strong>${result.discount_value}%</strong> off`
+            : ` — <strong>${fmt$(result.discount_value)}</strong> off`);
+      resultEl.innerHTML = `<div class="alert alert-success">✓ Valid coupon${disc}</div>`;
+    } else {
+      resultEl.innerHTML = `<div class="alert alert-error">✗ Invalid: ${esc(result.message || 'Unknown reason')}</div>`;
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<div class="alert alert-error">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+// ── Utility ────────────────────────────────────────────────
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Auto-connect if URL already stored
+if (cfg.url) connect();
+</script>
+</body>
+</html>
