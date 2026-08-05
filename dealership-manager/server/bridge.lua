@@ -249,22 +249,20 @@ local function route(req, res, body)
             -- Fall through to DB if export failed OR returned empty
             if #coupons == 0 then
                 local rows
-                local db_err1, db_err2
-                local db_ok = pcall(function()
+                local db_ok, db_err1 = pcall(function()
                     rows = exports.oxmysql:executeSync(
-                        'SELECT * FROM jg_dealership_coupons ORDER BY id DESC LIMIT 200',
-                        {}
+                        'SELECT * FROM jg_dealership_coupons ORDER BY id DESC LIMIT 200'
                     )
                 end)
+                print('^5[dealership-manager]^0 [coupons] oxmysql_ok=' .. tostring(db_ok) .. ' err=' .. tostring(db_err1))
                 if not db_ok or not rows then
-                    local ma_ok
-                    ma_ok, db_err2 = pcall(function()
+                    local ma_ok, db_err2 = pcall(function()
                         rows = MySQL.query.await(
                             'SELECT * FROM jg_dealership_coupons ORDER BY id DESC LIMIT 200',
                             {}
                         )
                     end)
-                    print('^5[dealership-manager]^0 [coupons] oxmysql_ok=' .. tostring(db_ok) .. ' mysql-async_ok=' .. tostring(ma_ok) .. ' err=' .. tostring(db_err2))
+                    print('^5[dealership-manager]^0 [coupons] mysql-async_ok=' .. tostring(ma_ok) .. ' err=' .. tostring(db_err2))
                 end
                 if rows and #rows > 0 then
                     local keys = {}
