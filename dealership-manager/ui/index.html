@@ -508,6 +508,56 @@ tbody tr:hover { background: var(--bg-raised); }
 .gap-8 { gap: 8px; }
 .items-center { align-items: center; }
 hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+/* ── Status board ───────────────────────────────────────── */
+.status-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: var(--r);
+  border: 1px solid;
+  margin-bottom: 24px;
+  font-weight: 600;
+  font-size: 15px;
+}
+.status-banner.operational { background: var(--green-bg);  border-color: var(--green);  color: var(--green);  }
+.status-banner.degraded    { background: var(--yellow-bg); border-color: var(--yellow); color: var(--yellow); }
+.status-banner.outage      { background: var(--red-bg);    border-color: var(--red);    color: var(--red);    }
+.status-banner.unknown     { background: var(--bg-raised); border-color: var(--border); color: var(--text-sub); }
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.status-section-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+.service-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.service-row:last-child { border-bottom: none; }
+.service-row:hover { background: var(--bg-raised); }
+.service-name { font-size: 13px; font-weight: 500; }
+.pulse {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.pulse.green  { background: var(--green);    box-shadow: 0 0 0 3px color-mix(in srgb, var(--green)  20%, transparent); }
+.pulse.yellow { background: var(--yellow);   box-shadow: 0 0 0 3px color-mix(in srgb, var(--yellow) 20%, transparent); }
+.pulse.red    { background: var(--red);      box-shadow: 0 0 0 3px color-mix(in srgb, var(--red)    20%, transparent); }
+.pulse.gray   { background: var(--text-dim); }
 </style>
 </head>
 <body>
@@ -566,6 +616,11 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
     <div class="nav-item" data-section="coupons">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
       Coupons
+    </div>
+    <span class="nav-label" style="margin-top:8px">Monitor</span>
+    <div class="nav-item" data-section="status">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Status
     </div>
   </nav>
 
@@ -749,6 +804,17 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
       </div>
     </div>
 
+    <!-- ── Status ── -->
+    <div class="section" id="section-status">
+      <div class="page-header">
+        <div class="page-title">Status Board</div>
+        <button class="btn btn-ghost btn-sm" onclick="loadStatus()">↺ Refresh</button>
+      </div>
+      <div id="status-content">
+        <div class="alert alert-info">Loading status…</div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -919,6 +985,7 @@ function reloadActiveSection() {
   else if (s === 'coupons')    loadCoupons();
   else if (s === 'overview')   loadOverview();
   else if (s === 'finance')    loadAllFinance();
+  else if (s === 'status')     loadStatus();
 }
 
 // ── Navigation ─────────────────────────────────────────────
@@ -931,14 +998,16 @@ document.querySelectorAll('.nav-item').forEach(el => {
 
 function navigate(section) {
   state.activeSection = section;
+  clearTimeout(statusRefreshTimer);
   document.querySelectorAll('.nav-item').forEach(el => {
     el.classList.toggle('active', el.dataset.section === section);
   });
   document.querySelectorAll('.section').forEach(el => {
     el.classList.toggle('active', el.id === 'section-' + section);
   });
-  // Finance loads without a dealership; everything else needs one selected
+  // Finance and Status load without a dealership selection
   if (section === 'finance') loadAllFinance();
+  else if (section === 'status') loadStatus();
   else {
     const globalId = document.getElementById('global-dealer').value;
     if (globalId) reloadActiveSection();
@@ -1593,6 +1662,178 @@ async function saveVehicleName(spawnCode, btn) {
   } catch (e) {
     toast('Error: ' + e.message, 'error');
     btn.disabled = false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATUS BOARD
+// ─────────────────────────────────────────────────────────────────────────────
+const CFX_STATUS_API = 'https://status.cfx.re/api/v2/summary.json';
+let statusRefreshTimer = null;
+
+const CFX_INDICATOR = {
+  none:     { label: 'All Systems Operational',  cls: 'operational', pulse: 'green'  },
+  minor:    { label: 'Minor Service Disruption', cls: 'degraded',    pulse: 'yellow' },
+  major:    { label: 'Major Service Disruption', cls: 'degraded',    pulse: 'yellow' },
+  critical: { label: 'Critical System Outage',   cls: 'outage',      pulse: 'red'    },
+};
+
+const COMPONENT_STATUS = {
+  operational:          { label: 'Operational',    badge: 'badge-green',  pulse: 'green'  },
+  degraded_performance: { label: 'Degraded',       badge: 'badge-yellow', pulse: 'yellow' },
+  partial_outage:       { label: 'Partial Outage', badge: 'badge-yellow', pulse: 'yellow' },
+  major_outage:         { label: 'Major Outage',   badge: 'badge-red',    pulse: 'red'    },
+  under_maintenance:    { label: 'Maintenance',    badge: 'badge-gray',   pulse: 'gray'   },
+};
+
+async function loadStatus() {
+  const el = document.getElementById('status-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+
+  const serverBase = cfg.url.trim().replace(/\/$/, '');
+
+  const [cfxRes, infoRes, playersRes] = await Promise.allSettled([
+    fetch(CFX_STATUS_API).then(r => r.json()),
+    serverBase ? fetch(`http://${serverBase}/info.json`).then(r => r.json()) : Promise.reject(new Error('not connected')),
+    serverBase ? fetch(`http://${serverBase}/players.json`).then(r => r.json()) : Promise.reject(new Error('not connected')),
+  ]);
+
+  const cfx     = cfxRes.status     === 'fulfilled' ? cfxRes.value     : null;
+  const info    = infoRes.status    === 'fulfilled' ? infoRes.value    : null;
+  const players = playersRes.status === 'fulfilled' ? playersRes.value : null;
+
+  let html = '';
+
+  // ── CFX platform banner ──────────────────────────────────
+  if (cfx) {
+    const indicator = cfx.status?.indicator || 'none';
+    const meta      = CFX_INDICATOR[indicator] || CFX_INDICATOR.none;
+    html += `
+      <div class="status-banner ${meta.cls}">
+        <div class="pulse ${meta.pulse}"></div>
+        <div>
+          <div>${meta.label}</div>
+          <div style="font-size:12px;font-weight:400;opacity:.75;margin-top:2px">${esc(cfx.status?.description || 'cfx.re platform status')}</div>
+        </div>
+        <div style="margin-left:auto;font-size:12px;font-weight:400;opacity:.6">Updated ${new Date().toLocaleTimeString()}</div>
+      </div>`;
+  } else {
+    html += `
+      <div class="status-banner unknown">
+        <div class="pulse gray"></div>
+        <div>CFX status unavailable — check network or <a href="https://status.cfx.re" target="_blank" style="color:inherit;text-decoration:underline">visit status.cfx.re</a></div>
+      </div>`;
+  }
+
+  // ── Your FiveM server ────────────────────────────────────
+  html += `<div style="margin-bottom:24px"><div class="status-section-header">Your FiveM Server</div>`;
+  if (!serverBase) {
+    html += `<div class="alert alert-info">Connect to your server above to monitor it here.</div>`;
+  } else if (info) {
+    const playerCount = Array.isArray(players) ? players.length : '?';
+    const maxPlayers  = info.vars?.sv_maxClients ?? info.sv_maxclients ?? '?';
+    const serverName  = info.vars?.sv_projectName || info.hostname || serverBase;
+    const resourceCnt = Array.isArray(info.resources) ? info.resources.length : '?';
+    const version     = info.version || info.server || '?';
+    const pct         = (typeof playerCount === 'number' && typeof maxPlayers === 'number')
+                          ? Math.round((playerCount / maxPlayers) * 100) : null;
+
+    html += `
+      <div class="status-grid">
+        <div class="card">
+          <div class="card-title">Status</div>
+          <div class="card-value" style="font-size:16px"><span class="badge badge-green" style="font-size:13px;padding:4px 12px">Online</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Players Online</div>
+          <div class="card-value">${playerCount}<span style="font-size:14px;color:var(--text-sub);font-weight:400"> / ${maxPlayers}</span></div>
+          ${pct !== null ? `<div class="progress-wrap mt-4"><div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div><span class="progress-label">${pct}%</span></div>` : ''}
+        </div>
+        <div class="card">
+          <div class="card-title">Resources</div>
+          <div class="card-value">${resourceCnt}</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Server Name</div>
+          <div class="card-value" style="font-size:14px;word-break:break-word">${esc(serverName)}</div>
+          <div class="card-sub mono">${esc(version)}</div>
+        </div>
+      </div>`;
+
+    if (Array.isArray(players) && players.length > 0) {
+      const cap      = 15;
+      const shown    = players.slice(0, cap);
+      const overflow = players.length - cap;
+      const rows     = shown.map(p => `
+        <div class="service-row">
+          <div class="service-name">${esc(p.name || 'Unknown')}</div>
+          <span class="badge badge-blue">#${p.id}</span>
+        </div>`).join('');
+      html += `
+        <div class="status-section-header" style="margin-top:4px">Online Players</div>
+        <div class="table-wrap">
+          ${rows}
+          ${overflow > 0 ? `<div class="service-row"><div class="service-name text-dim">… and ${overflow} more</div></div>` : ''}
+        </div>`;
+    } else {
+      html += `<div class="status-section-header" style="margin-top:4px">Online Players</div><div class="alert alert-warn" style="margin-bottom:0">No players currently online.</div>`;
+    }
+  } else {
+    html += `<div class="alert alert-error">Could not reach <span class="mono">${esc(serverBase)}/info.json</span> — server may be offline or HTTP endpoint is not accessible.</div>`;
+  }
+  html += '</div>';
+
+  // ── CFX component breakdown ──────────────────────────────
+  if (cfx) {
+    const components = (cfx.components || []).filter(c => !c.group);
+    if (components.length) {
+      const rows = components.map(c => {
+        const s = COMPONENT_STATUS[c.status] || { label: c.status, badge: 'badge-gray', pulse: 'gray' };
+        return `
+          <div class="service-row">
+            <div class="service-name">${esc(c.name)}</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="pulse ${s.pulse}"></div>
+              <span class="badge ${s.badge}">${s.label}</span>
+            </div>
+          </div>`;
+      }).join('');
+      html += `
+        <div style="margin-bottom:24px">
+          <div class="status-section-header">CFX Platform Services</div>
+          <div class="table-wrap">${rows}</div>
+        </div>`;
+    }
+
+    // ── Active incidents ─────────────────────────────────
+    const incidents = (cfx.incidents || []).filter(i => i.status !== 'resolved');
+    if (incidents.length) {
+      const iRows = incidents.map(i => {
+        const latest = i.incident_updates?.[0];
+        return `
+          <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
+            <div style="font-weight:600;font-size:13px">${esc(i.name)}</div>
+            <div style="font-size:12px;color:var(--text-sub);margin-top:3px">
+              <span class="badge badge-yellow" style="margin-right:6px">${esc(i.status)}</span>${fmtDate(i.updated_at || i.created_at)}
+            </div>
+            ${latest ? `<div style="font-size:12px;color:var(--text-dim);margin-top:5px;line-height:1.5">${esc(latest.body)}</div>` : ''}
+          </div>`;
+      }).join('');
+      html += `
+        <div style="margin-bottom:24px">
+          <div class="status-section-header">Active Incidents</div>
+          <div class="table-wrap">${iRows}</div>
+        </div>`;
+    }
+  }
+
+  el.innerHTML = html;
+
+  // Auto-refresh every 60 s while on this tab
+  clearTimeout(statusRefreshTimer);
+  if (state.activeSection === 'status') {
+    statusRefreshTimer = setTimeout(loadStatus, 60_000);
   }
 }
 
