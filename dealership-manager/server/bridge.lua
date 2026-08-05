@@ -239,12 +239,33 @@ local function route(req, res, body)
 
         -- GET /dealerships/{id}/coupons
         if #p == 3 and p[3] == 'coupons' and method == 'GET' then
-            return ok(res, jg('getCoupons', dealershipId) or {})
+            local coupons = {}
+            -- Try jg export first; fall back to direct DB query
+            local ok_jg = pcall(function() coupons = jg('getCoupons', dealershipId) or {} end)
+            if not ok_jg then
+                local ok_db = pcall(function()
+                    coupons = exports.oxmysql:executeSync(
+                        'SELECT * FROM jg_dealership_coupons WHERE dealership_id = ? ORDER BY id DESC',
+                        { dealershipId }
+                    ) or {}
+                end)
+                if not ok_db then
+                    pcall(function()
+                        coupons = MySQL.query.await(
+                            'SELECT * FROM jg_dealership_coupons WHERE dealership_id = ? ORDER BY id DESC',
+                            { dealershipId }
+                        ) or {}
+                    end)
+                end
+            end
+            return ok(res, coupons)
         end
 
         -- POST /dealerships/{id}/coupons   { discount_type, discount_value, … }
         if #p == 3 and p[3] == 'coupons' and method == 'POST' then
-            local coupon, e = jg('createCoupon', dealershipId, bodyData)
+            local coupon, e
+            local ok_jg = pcall(function() coupon, e = jg('createCoupon', dealershipId, bodyData) end)
+            if not ok_jg then return err(res, 501, 'createCoupon export not available in this jg-dealerships version') end
             if not coupon then return err(res, 400, e or 'Failed') end
             return ok(res, coupon)
         end
