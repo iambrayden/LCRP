@@ -261,7 +261,8 @@ end
 -- ── HTTP handler ─────────────────────────────────────────────────────────────
 
 SetHttpHandler(function(req, res)
-    -- OPTIONS preflight (CORS)
+    print('^5[dealership-manager]^0 ' .. req.method .. ' ' .. req.path)
+
     if req.method == 'OPTIONS' then
         req.setDataHandler(function()
             res.writeHead(200, CORS)
@@ -271,13 +272,11 @@ SetHttpHandler(function(req, res)
     end
 
     req.setDataHandler(function(body)
-        CreateThread(function()
-            local success, routeErr = pcall(route, req, res, body)
-            if not success then
-                res.writeHead(500, CORS)
-                res.send(json.encode({ error = 'Internal server error', detail = tostring(routeErr) }))
-            end
-        end)
+        local success, routeErr = pcall(route, req, res, body)
+        if not success then
+            res.writeHead(500, CORS)
+            res.send(json.encode({ error = 'Internal server error', detail = tostring(routeErr) }))
+        end
     end)
 end)
 
