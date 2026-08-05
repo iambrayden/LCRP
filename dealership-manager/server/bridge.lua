@@ -245,10 +245,11 @@ local function route(req, res, body)
                 local r = jg('getCoupons', dealershipId)
                 if r and #r > 0 then coupons = r end
             end)
+            print('^5[dealership-manager]^0 [coupons] jg_ok=' .. tostring(jg_ok) .. ' count=' .. #coupons .. ' err=' .. tostring(jg_err))
             -- Fall through to DB if export failed OR returned empty
             if #coupons == 0 then
                 local rows
-                -- Try without WHERE first to diagnose column names
+                local db_err1, db_err2
                 local db_ok = pcall(function()
                     rows = exports.oxmysql:executeSync(
                         'SELECT * FROM jg_dealership_coupons ORDER BY id DESC LIMIT 200',
@@ -256,20 +257,20 @@ local function route(req, res, body)
                     )
                 end)
                 if not db_ok or not rows then
-                    pcall(function()
+                    local ma_ok
+                    ma_ok, db_err2 = pcall(function()
                         rows = MySQL.query.await(
                             'SELECT * FROM jg_dealership_coupons ORDER BY id DESC LIMIT 200',
                             {}
                         )
                     end)
+                    print('^5[dealership-manager]^0 [coupons] oxmysql_ok=' .. tostring(db_ok) .. ' mysql-async_ok=' .. tostring(ma_ok) .. ' err=' .. tostring(db_err2))
                 end
                 if rows and #rows > 0 then
-                    -- Log first row keys so we can see the real column names
                     local keys = {}
                     for k in pairs(rows[1]) do keys[#keys+1] = k end
-                    print('^5[dealership-manager]^0 jg_dealership_coupons columns: ' .. table.concat(keys, ', '))
-                    print('^5[dealership-manager]^0 total rows: ' .. #rows .. ', querying dealershipId: ' .. tostring(dealershipId))
-                    -- Filter rows that match this dealership (try common column names)
+                    print('^5[dealership-manager]^0 [coupons] columns: ' .. table.concat(keys, ', '))
+                    print('^5[dealership-manager]^0 [coupons] total rows=' .. #rows .. ' dealershipId=' .. tostring(dealershipId))
                     for _, row in ipairs(rows) do
                         local rid = row.dealership_id or row.dealershipId or row.dealership or ''
                         if rid == dealershipId then
@@ -277,9 +278,10 @@ local function route(req, res, body)
                         end
                     end
                     if #coupons == 0 then
-                        -- Log one sample row so we can see the actual dealership column value
-                        print('^5[dealership-manager]^0 no match found, sample row: ' .. json.encode(rows[1]))
+                        print('^5[dealership-manager]^0 [coupons] no match, sample row: ' .. json.encode(rows[1]))
                     end
+                else
+                    print('^5[dealership-manager]^0 [coupons] DB returned nil/empty rows')
                 end
             end
             return ok(res, coupons)
