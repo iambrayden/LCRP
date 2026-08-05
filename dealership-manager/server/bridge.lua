@@ -67,12 +67,17 @@ local function route(req, res, body)
     -- ── UI ───────────────────────────────────────────────────────────────────
     -- GET / → serve the management UI
     if #p == 0 and method == 'GET' then
+        print('[dealership-manager] step 1: loading ui/index.html')
         local html = LoadResourceFile(GetCurrentResourceName(), 'ui/index.html')
+        print('[dealership-manager] step 2: html=' .. (html and #html or 'nil'))
         if not html then
             return err(res, 500, 'UI file not found')
         end
+        print('[dealership-manager] step 3: calling writeHead')
         res.writeHead(200, { ['Content-Type'] = 'text/html; charset=utf-8' })
+        print('[dealership-manager] step 4: calling send')
         res.send(html)
+        print('[dealership-manager] step 5: done')
         return
     end
 
