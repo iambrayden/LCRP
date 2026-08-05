@@ -1365,12 +1365,21 @@ async function selectCustomer(identifier) {
     const fd_raw     = financeMap[s.plate];
     let financeCell  = '<span class="text-dim">—</span>';
     if (isFinanced && fd_raw) {
-      let fd = {};
-      try { fd = typeof fd_raw.finance_data === 'string' ? JSON.parse(fd_raw.finance_data) : (fd_raw.finance_data || fd_raw); } catch {}
-      const done  = fd.payments_complete ?? fd_raw.payments_complete ?? 0;
-      const total = fd.total_payments    ?? fd_raw.total_payments    ?? 1;
+      // Flatten: jg-dealerships may nest data in finance_data JSON or return fields directly
+      let fd = fd_raw;
+      if (typeof fd_raw.finance_data === 'string') {
+        try { fd = { ...fd_raw, ...JSON.parse(fd_raw.finance_data) }; } catch {}
+      } else if (fd_raw.finance_data && typeof fd_raw.finance_data === 'object') {
+        fd = { ...fd_raw, ...fd_raw.finance_data };
+      }
+      console.debug('[finance debug]', fd_raw, '→ merged:', fd);
+      const done  = fd.payments_complete  ?? fd.paymentsComplete  ?? 0;
+      const total = fd.total_payments     ?? fd.totalPayments     ?? fd.payments ?? 1;
       const pct   = Math.round((done / total) * 100);
-      const amt   = fd.payment_amount    ?? fd_raw.payment_amount    ?? 0;
+      // Try every known field name jg-dealerships uses for the per-payment amount
+      const amt   = fd.payment_amount     ?? fd.paymentAmount     ?? fd.amount   ??
+                    fd.weekly_payment     ?? fd.weeklyPayment      ??
+                    (total > 0 ? Math.round((fd.finance_price ?? fd.financePrice ?? fd.owed ?? 0) / total) : 0);
       financeCell = `
         <div class="progress-wrap" style="min-width:120px">
           <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
