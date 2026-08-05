@@ -931,94 +931,74 @@ document.getElementById('btn-theme').addEventListener('click', () => {
 async function loadOverview() {
   if (!state.connected) return;
   const el = document.getElementById('overview-content');
+  const dealershipId = document.getElementById('global-dealer').value;
+
+  if (!dealershipId) {
+    el.innerHTML = '<div class="alert alert-info">Select a dealership above to view its overview.</div>';
+    return;
+  }
+
   el.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
 
   try {
-    const dealerships = await api.get('/dealerships');
-    state.dealerships = dealerships;
-    populateDealerSelects();
+    const [dealer, balRes, totalRes, empRes, vehiclesRes, salesRes] = await Promise.allSettled([
+      api.get(`/dealerships/${dealershipId}`),
+      api.get(`/dealerships/${dealershipId}/balance`),
+      api.get(`/dealerships/${dealershipId}/total-sales`),
+      api.get(`/dealerships/${dealershipId}/employees`),
+      api.get(`/dealerships/${dealershipId}/vehicles`),
+      api.get(`/dealerships/${dealershipId}/sales?limit=5`),
+    ]);
 
-    // Fetch balance + total sales for each in parallel
-    const enriched = await Promise.all(dealerships.map(async d => {
-      const [balRes, totalRes, empRes] = await Promise.allSettled([
-        api.get(`/dealerships/${d.id}/balance`),
-        api.get(`/dealerships/${d.id}/total-sales`),
-        api.get(`/dealerships/${d.id}/employees`),
-      ]);
-      return {
-        ...d,
-        balance:    balRes.status   === 'fulfilled' ? balRes.value.balance    : null,
-        totalSales: totalRes.status === 'fulfilled' ? totalRes.value.total    : null,
-        empCount:   empRes.status   === 'fulfilled' ? empRes.value.length     : null,
-      };
-    }));
+    const d         = dealer.status      === 'fulfilled' ? dealer.value          : {};
+    const balance   = balRes.status      === 'fulfilled' ? balRes.value.balance  : null;
+    const revenue   = totalRes.status    === 'fulfilled' ? totalRes.value.total  : null;
+    const employees = empRes.status      === 'fulfilled' ? empRes.value          : [];
+    const vehicles  = vehiclesRes.status === 'fulfilled' ? vehiclesRes.value     : [];
+    const sales     = salesRes.status    === 'fulfilled' ? salesRes.value        : [];
 
-    if (!enriched.length) {
-      el.innerHTML = '<div class="alert alert-warn">No dealerships found. Make sure jg-dealerships is running.</div>';
-      return;
-    }
+    const inStock    = vehicles.filter(v => !v.unlimited_stock && (v.stock ?? 0) > 0).length;
+    const outOfStock = vehicles.filter(v => !v.unlimited_stock && (v.stock ?? 0) === 0).length;
+    const unlimited  = vehicles.filter(v => v.unlimited_stock).length;
 
-    // Summary row
-    const totalBal   = enriched.reduce((s, d) => s + (d.balance    ?? 0), 0);
-    const totalSales = enriched.reduce((s, d) => s + (d.totalSales ?? 0), 0);
-    const totalEmps  = enriched.reduce((s, d) => s + (d.empCount   ?? 0), 0);
+    const recentRows = sales.length ? sales.map(s => `
+      <tr>
+        <td class="mono">${esc(s.plate || '—')}</td>
+        <td class="mono">${esc(s.vehicle || '—')}</td>
+        <td class="text-sub">${esc(s.player || '—')}</td>
+        <td>${purchaseBadge(s.purchase_type)}</td>
+        <td style="color:var(--green);font-weight:600">${fmt$(s.paid)}</td>
+      </tr>`).join('')
+      : '<tr><td colspan="5" class="loading-row">No recent sales.</td></tr>';
 
-    let html = `
+    el.innerHTML = `
       <div class="card-grid mb-16">
         <div class="card">
-          <div class="card-title">Dealerships</div>
-          <div class="card-value">${enriched.length}</div>
-        </div>
-        <div class="card">
-          <div class="card-title">Total Balance</div>
-          <div class="card-value">${fmt$(totalBal)}</div>
+          <div class="card-title">Balance</div>
+          <div class="card-value">${fmt$(balance)}</div>
         </div>
         <div class="card">
           <div class="card-title">Total Revenue</div>
-          <div class="card-value">${fmt$(totalSales)}</div>
+          <div class="card-value">${fmt$(revenue)}</div>
         </div>
         <div class="card">
-          <div class="card-title">Total Employees</div>
-          <div class="card-value">${totalEmps}</div>
+          <div class="card-title">Employees</div>
+          <div class="card-value">${employees.length}</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Vehicles</div>
+          <div class="card-value">${vehicles.length}</div>
+          <div class="card-sub">${inStock} in stock · ${outOfStock} out · ${unlimited} unlimited</div>
         </div>
       </div>
-      <div class="dealer-grid">`;
 
-    enriched.forEach(d => {
-      html += `
-        <div class="dealer-card">
-          <div>
-            <div class="dealer-card-name">${esc(d.name || d.id)}</div>
-            <div class="dealer-card-id">${esc(d.id)}</div>
-          </div>
-          <div class="dealer-card-stats">
-            <div class="dealer-stat">
-              <div class="dealer-stat-label">Balance</div>
-              <div class="dealer-stat-value">${fmt$(d.balance)}</div>
-            </div>
-            <div class="dealer-stat">
-              <div class="dealer-stat-label">Revenue</div>
-              <div class="dealer-stat-value">${fmt$(d.totalSales)}</div>
-            </div>
-            <div class="dealer-stat">
-              <div class="dealer-stat-label">Employees</div>
-              <div class="dealer-stat-value">${d.empCount ?? '—'}</div>
-            </div>
-            <div class="dealer-stat">
-              <div class="dealer-stat-label">Type</div>
-              <div class="dealer-stat-value" style="font-size:13px">${esc(d.type || '—')}</div>
-            </div>
-          </div>
-          <div class="dealer-card-actions">
-            <button class="btn btn-sm btn-ghost" onclick="navigate('stock');document.getElementById('stock-dealer').value='${esc(d.id)}';loadStock()">Stock</button>
-            <button class="btn btn-sm btn-ghost" onclick="navigate('sales');document.getElementById('sales-dealer').value='${esc(d.id)}';loadSales()">Sales</button>
-            <button class="btn btn-sm btn-ghost" onclick="navigate('employees');document.getElementById('emp-dealer').value='${esc(d.id)}';loadEmployees()">Employees</button>
-          </div>
-        </div>`;
-    });
-
-    html += '</div>';
-    el.innerHTML = html;
+      <div class="page-title" style="font-size:15px;margin-bottom:12px">Recent Sales</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Plate</th><th>Vehicle</th><th>Player</th><th>Type</th><th>Amount</th></tr></thead>
+          <tbody>${recentRows}</tbody>
+        </table>
+      </div>`;
   } catch (e) {
     el.innerHTML = `<div class="alert alert-error">Failed to load: ${esc(e.message)}</div>`;
   }
