@@ -51,9 +51,10 @@ end
 -- ── Router ───────────────────────────────────────────────────────────────────
 
 local function route(req, res, body)
-    local method = req.method
-    local p      = parts(req.path)
-    local q      = req.query or {}
+    local method   = req.method
+    local rawPath  = req.path:match('^([^?#]*)') or req.path
+    local p        = parts(rawPath)
+    local q        = req.query or {}
 
     local bodyData = {}
     if body and #body > 0 then
@@ -256,7 +257,7 @@ local function route(req, res, body)
     end
 
     -- ── Catch-all ────────────────────────────────────────────────────────────
-    return err(res, 404, 'Route not found: ' .. method .. ' ' .. req.path)
+    return err(res, 404, 'Route not found: ' .. method .. ' ' .. rawPath)
 end
 
 -- ── HTTP handler ─────────────────────────────────────────────────────────────
