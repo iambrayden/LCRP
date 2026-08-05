@@ -90,14 +90,51 @@ AddEventHandler('playerDropped', function()
     end)
 end)
 
+local function dbLookupPlayerName(identifier)
+    -- Try oxmysql first (standard on qbox/QBCore)
+    local ok1, rows = pcall(function()
+        return exports.oxmysql:executeSync(
+            'SELECT charinfo FROM players WHERE citizenid = ? LIMIT 1',
+            { identifier }
+        )
+    end)
+    if not ok1 or not rows then
+        -- Fall back to mysql-async style
+        ok1, rows = pcall(function()
+            return MySQL.query.await(
+                'SELECT charinfo FROM players WHERE citizenid = ? LIMIT 1',
+                { identifier }
+            )
+        end)
+    end
+    if ok1 and rows and rows[1] then
+        local ci = rows[1].charinfo
+        if type(ci) == 'string' then
+            local ok2, decoded = pcall(json.decode, ci)
+            if ok2 then ci = decoded end
+        end
+        if type(ci) == 'table' and (ci.firstname or ci.lastname) then
+            local name = ((ci.firstname or '') .. ' ' .. (ci.lastname or '')):match('^%s*(.-)%s*$')
+            if name and name ~= '' then
+                playerNames[identifier] = name
+                return name
+            end
+        end
+    end
+end
+
 local function lookupPlayerName(identifier)
+    if not identifier or identifier == '' then return nil end
     if playerNames[identifier] then return playerNames[identifier] end
+    -- Try live QBCore lookup (works if player is currently online)
     pcall(function()
         local QBCore = exports['qb-core']:GetCoreObject()
         local Player = QBCore.Functions.GetPlayerByCitizenId(identifier)
         if Player then cacheQBPlayer(Player) end
     end)
-    return playerNames[identifier]
+    if playerNames[identifier] then return playerNames[identifier] end
+    -- Fall back to database for offline players
+    return dbLookupPlayerName(identifier)
 end
 
 -- ── Router ───────────────────────────────────────────────────────────────────
