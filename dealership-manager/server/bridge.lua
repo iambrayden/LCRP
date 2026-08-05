@@ -276,6 +276,33 @@ local function route(req, res, body)
     end
 
     -- ── Finance ──────────────────────────────────────────────────────────────
+    -- GET /finance?limit=100  (all active finance deals via direct DB query)
+    if #p == 1 and p[1] == 'finance' and method == 'GET' then
+        local limit = math.min(tonumber(q.limit) or 100, 1000)
+        local rows = {}
+        local ok_q = pcall(function()
+            rows = exports.oxmysql:executeSync(
+                'SELECT * FROM jg_dealership_finance ORDER BY id DESC LIMIT ?',
+                { limit }
+            ) or {}
+        end)
+        if not ok_q then
+            -- fallback: try mysql-async style
+            pcall(function()
+                rows = MySQL.query.await(
+                    'SELECT * FROM jg_dealership_finance ORDER BY id DESC LIMIT ?',
+                    { limit }
+                ) or {}
+            end)
+        end
+        -- Attach resolved player names
+        for _, row in ipairs(rows) do
+            local name = lookupPlayerName(row.identifier)
+            if name then row.player_name = name end
+        end
+        return ok(res, rows)
+    end
+
     if #p >= 2 and p[1] == 'finance' then
 
         -- GET /finance/plate/{plate}
