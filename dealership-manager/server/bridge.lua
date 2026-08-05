@@ -51,10 +51,6 @@ end
 -- ── Router ───────────────────────────────────────────────────────────────────
 
 local function route(req, res, body)
-    if not authorized(req) then
-        return err(res, 401, 'Unauthorized — set X-API-Key header')
-    end
-
     local method = req.method
     local p      = parts(req.path)
     local q      = req.query or {}
@@ -65,20 +61,20 @@ local function route(req, res, body)
     end
 
     -- ── UI ───────────────────────────────────────────────────────────────────
-    -- GET / → serve the management UI
+    -- GET / → serve the management UI (no auth required)
     if #p == 0 and method == 'GET' then
-        print('[dealership-manager] step 1: loading ui/index.html')
         local html = LoadResourceFile(GetCurrentResourceName(), 'ui/index.html')
-        print('[dealership-manager] step 2: html=' .. (html and #html or 'nil'))
         if not html then
             return err(res, 500, 'UI file not found')
         end
-        print('[dealership-manager] step 3: calling writeHead')
         res.writeHead(200, { ['Content-Type'] = 'text/html; charset=utf-8' })
-        print('[dealership-manager] step 4: calling send')
         res.send(html)
-        print('[dealership-manager] step 5: done')
         return
+    end
+
+    -- All API routes below require auth
+    if not authorized(req) then
+        return err(res, 401, 'Unauthorized — set X-API-Key header')
     end
 
     -- GET /health
