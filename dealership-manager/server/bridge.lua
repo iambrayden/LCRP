@@ -240,22 +240,46 @@ local function route(req, res, body)
         -- GET /dealerships/{id}/coupons
         if #p == 3 and p[3] == 'coupons' and method == 'GET' then
             local coupons = {}
-            -- Try jg export first; fall back to direct DB query
-            local ok_jg = pcall(function() coupons = jg('getCoupons', dealershipId) or {} end)
-            if not ok_jg then
-                local ok_db = pcall(function()
-                    coupons = exports.oxmysql:executeSync(
-                        'SELECT * FROM jg_dealership_coupons WHERE dealership_id = ? ORDER BY id DESC',
-                        { dealershipId }
-                    ) or {}
+            -- Try jg export; only use result if it returns a non-empty table
+            local jg_ok, jg_err = pcall(function()
+                local r = jg('getCoupons', dealershipId)
+                if r and #r > 0 then coupons = r end
+            end)
+            -- Fall through to DB if export failed OR returned empty
+            if #coupons == 0 then
+                local rows
+                -- Try without WHERE first to diagnose column names
+                local db_ok = pcall(function()
+                    rows = exports.oxmysql:executeSync(
+                        'SELECT * FROM jg_dealership_coupons ORDER BY id DESC LIMIT 200',
+                        {}
+                    )
                 end)
-                if not ok_db then
+                if not db_ok or not rows then
                     pcall(function()
-                        coupons = MySQL.query.await(
-                            'SELECT * FROM jg_dealership_coupons WHERE dealership_id = ? ORDER BY id DESC',
-                            { dealershipId }
-                        ) or {}
+                        rows = MySQL.query.await(
+                            'SELECT * FROM jg_dealership_coupons ORDER BY id DESC LIMIT 200',
+                            {}
+                        )
                     end)
+                end
+                if rows and #rows > 0 then
+                    -- Log first row keys so we can see the real column names
+                    local keys = {}
+                    for k in pairs(rows[1]) do keys[#keys+1] = k end
+                    print('^5[dealership-manager]^0 jg_dealership_coupons columns: ' .. table.concat(keys, ', '))
+                    print('^5[dealership-manager]^0 total rows: ' .. #rows .. ', querying dealershipId: ' .. tostring(dealershipId))
+                    -- Filter rows that match this dealership (try common column names)
+                    for _, row in ipairs(rows) do
+                        local rid = row.dealership_id or row.dealershipId or row.dealership or ''
+                        if rid == dealershipId then
+                            coupons[#coupons+1] = row
+                        end
+                    end
+                    if #coupons == 0 then
+                        -- Log one sample row so we can see the actual dealership column value
+                        print('^5[dealership-manager]^0 no match found, sample row: ' .. json.encode(rows[1]))
+                    end
                 end
             end
             return ok(res, coupons)
