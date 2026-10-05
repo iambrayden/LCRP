@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Halloween Wheel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app" class="hidden">
+        <div class="panel" id="panel">
+            <div class="vignette"></div>
+            <div class="moon"></div>
+            <div class="embers" id="embers" aria-hidden="true"></div>
+
+            <header class="header">
+                <div class="brand">
+                    <span class="pumpkin">🎃</span>
+                    <div>
+                        <p class="eyebrow">Last Chance Roleplay</p>
+                        <h1>Halloween Countdown</h1>
+                    </div>
+                </div>
+
+                <div class="fear">
+                    <div class="fear-top">
+                        <span>Fear level</span>
+                        <b id="fear-label">Spooky</b>
+                    </div>
+                    <div class="fear-bar"><div class="fear-fill" id="fear-fill"></div></div>
+                </div>
+
+                <button class="close" id="close" title="Close (Esc)">✕</button>
+            </header>
+
+            <section class="countdown">
+                <div class="countdown-main" id="countdown-main"></div>
+                <p class="countdown-sub" id="countdown-sub"></p>
+            </section>
+
+            <div class="body">
+                <div class="calendar">
+                    <div class="legend">
+                        <span><i class="dot available"></i>Ready to spin</span>
+                        <span><i class="dot claimed"></i>Won</span>
+                        <span><i class="dot locked"></i>Locked</span>
+                        <span><i class="dot missed"></i>Expired</span>
+                    </div>
+                    <div class="grid" id="grid"></div>
+                </div>
+
+                <aside class="spin-panel">
+                    <div class="spin-head">
+                        <p class="detail-eyebrow" id="detail-eyebrow"></p>
+                        <h2 id="detail-title"></h2>
+                    </div>
+
+                    <div class="wheel-wrap" id="wheel-wrap">
+                        <div class="pointer" id="pointer"></div>
+                        <div class="wheel" id="wheel"></div>
+                        <div class="hub">🎃</div>
+                    </div>
+
+                    <button class="spin" id="spin">Spin</button>
+                    <p class="detail-note" id="detail-note"></p>
+                </aside>
+            </div>
+
+            <div class="result hidden" id="result">
+                <div class="result-card" id="result-card">
+                    <p class="result-eyebrow" id="result-eyebrow"></p>
+                    <div class="result-icon" id="result-icon"></div>
+                    <h3 id="result-title"></h3>
+                    <p class="result-tier" id="result-tier"></p>
+                    <p class="result-note" id="result-note"></p>
+                    <button class="spin" id="result-ok">Nice!</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
