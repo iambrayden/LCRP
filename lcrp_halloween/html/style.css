@@ -15,6 +15,10 @@
 
     /* 0 on day 1 -> 1 on Halloween. Set from JS for the selected day. */
     --fear: 0;
+    /* Orange -> blood red as fear rises. Mixed in JS because FiveM's NUI
+       browser is too old for CSS color-mix(). */
+    --accent: #ff7a18;
+    --accent-soft: #ff7a18;
     --wheel-size: clamp(200px, 33vh, 300px);
 }
 
@@ -54,7 +58,7 @@ html, body {
     gap: clamp(10px, 1.8vh, 18px);
     padding: clamp(16px, 2.4vh, 26px) 28px clamp(16px, 2.4vh, 28px);
     border-radius: 20px;
-    border: 1px solid color-mix(in srgb, var(--orange) calc(100% - var(--fear) * 100%), var(--blood));
+    border: 1px solid var(--accent);
     background:
         radial-gradient(900px 400px at 10% -10%, rgba(139, 61, 255, calc(0.22 - var(--fear) * 0.12)), transparent 60%),
         radial-gradient(800px 500px at 100% 110%, rgba(196, 18, 47, calc(0.06 + var(--fear) * 0.3)), transparent 60%),
@@ -233,7 +237,7 @@ h1 {
     justify-content: center;
     gap: 10px;
     border-radius: 12px;
-    border: 1px solid color-mix(in srgb, rgba(255, 255, 255, 0.08) calc(100% - var(--t) * 100%), rgba(196, 18, 47, 0.55));
+    border: 1px solid var(--tile-border, rgba(255, 255, 255, 0.08));
     background:
         linear-gradient(180deg, rgba(196, 18, 47, calc(var(--t) * 0.18)), transparent),
         var(--panel-2);
@@ -315,7 +319,7 @@ h1 {
     border-radius: 50%;
     box-shadow:
         0 0 0 6px #2a1738,
-        0 0 0 8px color-mix(in srgb, var(--orange) calc(100% - var(--fear) * 100%), var(--blood)),
+        0 0 0 8px var(--accent),
         0 0 calc(20px + var(--fear) * 40px) rgba(196, 18, 47, calc(0.2 + var(--fear) * 0.5));
     will-change: transform;
 }
@@ -368,7 +372,7 @@ h1 {
     font-size: 26px;
     border-radius: 50%;
     background: #1a0f26;
-    border: 3px solid color-mix(in srgb, var(--orange) calc(100% - var(--fear) * 100%), var(--blood));
+    border: 3px solid var(--accent);
     box-shadow: 0 0 14px rgba(0, 0, 0, 0.6);
     z-index: 1;
 }
@@ -384,7 +388,7 @@ h1 {
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: #1a0d00;
-    background: linear-gradient(180deg, var(--orange-2), color-mix(in srgb, var(--orange) calc(100% - var(--fear) * 70%), var(--blood)));
+    background: linear-gradient(180deg, var(--orange-2), var(--accent-soft));
     box-shadow: 0 8px 24px rgba(255, 122, 24, 0.3);
     cursor: pointer;
     transition: 0.15s;

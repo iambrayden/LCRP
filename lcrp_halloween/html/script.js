@@ -104,6 +104,15 @@ function winSound(jackpot) {
 
 /* ---------- Intensity ---------- */
 
+const ORANGE = [255, 122, 24];
+const BLOOD = [196, 18, 47];
+
+/** Blends two RGB colours. Done here instead of CSS color-mix(), which FiveM's NUI browser doesn't support. */
+function mix(a, b, t, alpha = 1) {
+    const c = a.map((v, i) => Math.round(v + (b[i] - v) * t));
+    return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${alpha})`;
+}
+
 function todayEntry() {
     if (!state) return null;
     const index = Math.min(Math.max(state.today, 1), state.days.length);
@@ -137,6 +146,8 @@ function applyIntensity() {
     const day = selected() || today;
     const fear = day ? day.intensity : 0;
     panel.style.setProperty('--fear', fear.toFixed(3));
+    panel.style.setProperty('--accent', mix(ORANGE, BLOOD, fear));
+    panel.style.setProperty('--accent-soft', mix(ORANGE, BLOOD, fear * 0.7));
     panel.classList.toggle('nightmare', fear >= 0.85);
     renderEmbers(fear);
 
@@ -336,6 +347,7 @@ function renderGrid() {
         const tile = document.createElement('div');
         tile.className = `tile ${day.status}${isGrand(day) ? ' grand' : ''}${day.day === selectedDay ? ' selected' : ''}`;
         tile.style.setProperty('--t', day.intensity.toFixed(3));
+        tile.style.setProperty('--tile-border', mix([255, 255, 255], BLOOD, day.intensity, (0.08 + day.intensity * 0.47).toFixed(3)));
         tile.onclick = () => {
             if (spinning) return;
             selectedDay = day.day;
